@@ -7,8 +7,6 @@
 // This #include statement was automatically added by the Particle IDE.
 #include <MQTT.h>
 
-//
-
 // xbee object
 XBee xbee = XBee();
 
