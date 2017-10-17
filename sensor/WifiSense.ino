@@ -1,9 +1,10 @@
 // based on Ray Burnette 20161013 work ( using Arduino 1.6.12 )
+// added XBEE transport by Ivan Padilla 20171001
+// added MQTT-SN encapsulation by Ivan Padilla 20171001
 
 #include <WiFi.h>
-#include "./functions.h"
 #include <XBee.h>
-
+#include "./functions.h"
 
 #define disable 0
 #define enable  1

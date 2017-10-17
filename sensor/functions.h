@@ -11,14 +11,27 @@ extern "C" {
 }
 
 #include <WiFi.h>
-#include "./structures.h"
 #include <XBee.h>
 #include <Printers.h>
+#include "./structures.h"
 
+//Wifi Sensor Parameters
 #define MAX_APS_TRACKED 100
 #define MAX_CLIENTS_TRACKED 200
 
+//MQTT-SN Operational parameters
+#define MQTT_SN_MAX_PACKET_LENGTH     (255)
+#define MQTT_SN_TYPE_PUBLISH          (0x0C)
+#define MQTT_SN_FLAG_QOS_N1           (0x3 << 5)
+#define MQTT_SN_FLAG_RETAIN           (0x1 << 4)
+#define MQTT_SN_TOPIC_TYPE_SHORT      (0x02)
+
+
+//Xbee Payload definition
+
 uint8_t payload[7] ;
+
+//XBEE parameters of remote coordinator
 
 XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40a6a3ee);
 ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
@@ -26,6 +39,28 @@ ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 
 XBee xbee = XBee();
 
+//MQTT Message constructor
+
+void sendMessage(const char topic[2], String message, bool retain=false)
+{
+  byte header[7];
+
+  header[0] = sizeof(header) + message.length();
+  header[1] = MQTT_SN_TYPE_PUBLISH;
+  header[2] = MQTT_SN_FLAG_QOS_N1 | MQTT_SN_TOPIC_TYPE_SHORT;
+  if (retain) {
+    header[2] |= MQTT_SN_FLAG_RETAIN;
+  }
+  header[3] = topic[0];
+  header[4] = topic[1];
+  header[5] = 0x00;  // Message ID High
+  header[6] = 0x00;  // message ID Low
+  //Serial.write(header, sizeof(header));
+  //Serial.print(message);
+  
+}
+
+// WiFi Sense functions
 
 beaconinfo aps_known[MAX_APS_TRACKED];                    // Array to save MACs of known APs
 int aps_known_count = 0;                                  // Number of known APs
@@ -103,7 +138,11 @@ void print_client(clientinfo ci)
   } else {
     Serial.printf("DEVICE: ");
     for (int i = 0; i < 6; i++) {
+      
+      //print detected MAC to console
       Serial.printf("%02x", ci.station[i]);
+
+      // log detected MAC to XBEE next Payload
       payload[i] = ci.station[i];
     }
     
