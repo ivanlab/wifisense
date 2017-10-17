@@ -7,10 +7,12 @@
 // This #include statement was automatically added by the Particle IDE.
 #include <MQTT.h>
 
+//
+
 // xbee object
 XBee xbee = XBee();
 
-// payload array for xbee transmission 
+// payload array for xbee transmission
 byte payload[6] ;
 
 // TX objects:
@@ -33,20 +35,20 @@ ModemStatusResponse msr = ModemStatusResponse();
 
 
 void setup() {
-    
+
     Serial.begin(9600);
     Serial1.begin(9600);
     xbee.setSerial(Serial1);
-    
+
     Serial.println ("Todo ok hasta aqui");
 
 }
 
 void loop() {
-    
-    
+
+
    xbee.readPacket();
-    
+
     if (xbee.getResponse().isAvailable()) {
       // got something
       if (xbee.getResponse().getApiId() == ZB_RX_RESPONSE) {
@@ -54,7 +56,7 @@ void loop() {
         Serial.println("got a new report");
         // now fill our zb rx class
         xbee.getResponse().getZBRxResponse(rx);
-            
+
         if (rx.getOption() == ZB_PACKET_ACKNOWLEDGED) {
             // the sender got an ACK
             Serial.println ("Sender is informed about it");
@@ -75,7 +77,7 @@ void loop() {
       } else if (xbee.getResponse().getApiId() == MODEM_STATUS_RESPONSE) {
         xbee.getResponse().getModemStatusResponse(msr);
         // the local XBee sends this response on certain events, like association/dissociation
-        
+
         if (msr.getStatus() == ASSOCIATED) {
           // yay this is great.  flash led
           Serial.print ("local Xbee got associated");
@@ -88,14 +90,14 @@ void loop() {
         }
       } else {
       	// not something we were expecting
-        Serial.print ("I got something not expected...moving on");    
+        Serial.print ("I got something not expected...moving on");
       }
     } else if (xbee.getResponse().isError()) {
-      Serial.print("Error reading packet.  Error code: ");  
+      Serial.print("Error reading packet.  Error code: ");
       Serial.println(xbee.getResponse().getErrorCode());
     }
-    
-    
+
+
     delay(1000);
 
 }
@@ -112,6 +114,3 @@ void flashLed(int pin, int times, int wait) {
     }
   }
 }
-
-
-
