@@ -1,4 +1,6 @@
 
+
+
 // This-->tab == "functions.h"
 
 // Expose Espressif SDK functionality
@@ -15,11 +17,15 @@ extern "C" {
 #include <Printers.h>
 #include "./structures.h"
 
+
 //Wifi Sensor Parameters
 #define MAX_APS_TRACKED 100
 #define MAX_CLIENTS_TRACKED 200
 
-//MQTT-SN Operational parameters
+XBee xbee = XBee();
+
+//MQTT-SN Parameters
+
 #define MQTT_SN_MAX_PACKET_LENGTH     (255)
 #define MQTT_SN_TYPE_PUBLISH          (0x0C)
 #define MQTT_SN_FLAG_QOS_N1           (0x3 << 5)
@@ -27,38 +33,49 @@ extern "C" {
 #define MQTT_SN_TOPIC_TYPE_SHORT      (0x02)
 
 
-//Xbee Payload definition
+// MQTT-SN Encapsulation
 
-uint8_t payload[7] ;
-
-//XBEE parameters of remote coordinator
-
-XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40a6a3ee);
-ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
-ZBTxStatusResponse txStatus = ZBTxStatusResponse();
-
-XBee xbee = XBee();
-
-//MQTT Message constructor
-
-void sendMessage(const char topic[2], String message, bool retain=false)
+void sendMessage(const char topic[2], byte message[7], bool retain=false)
 {
-  byte header[7];
+  uint8_t payload[15];
 
-  header[0] = sizeof(header) + message.length();
-  header[1] = MQTT_SN_TYPE_PUBLISH;
-  header[2] = MQTT_SN_FLAG_QOS_N1 | MQTT_SN_TOPIC_TYPE_SHORT;
+  XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40a6a3ee);
+  ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
+  ZBTxStatusResponse txStatus = ZBTxStatusResponse();
+
+  payload[0] = 15; // header +sizeof message
+  payload[1] = MQTT_SN_TYPE_PUBLISH;
+  payload[2] = MQTT_SN_FLAG_QOS_N1 | MQTT_SN_TOPIC_TYPE_SHORT;
   if (retain) {
-    header[2] |= MQTT_SN_FLAG_RETAIN;
+    payload[2] |= MQTT_SN_FLAG_RETAIN;
   }
-  header[3] = topic[0];
-  header[4] = topic[1];
-  header[5] = 0x00;  // Message ID High
-  header[6] = 0x00;  // message ID Low
-  //Serial.write(header, sizeof(header));
-  //Serial.print(message);
+  payload[3] = topic[0];
+  payload[4] = topic[1];
+  payload[5] = 0x00;  // Message ID High
+  payload[6] = 0x00;  // message ID Low
+  payload[7] = 0x07;  // size of header
+
+  for (int i=8;i<15;i++){
+    payload[i] = message[i-8];
+    //Serial.print(payload[i],HEX);
   
+  }
+
+  for (int i=0; i<8; i++){
+    Serial.print (payload[i]);
+    Serial.print (".");
+  }
+
+  for (int i=8;i<14;i++){
+    Serial.print(payload[i],HEX);
+    Serial.print (":");
+  }
+
+  Serial.print ((payload[14]), DEC);
+  
+  xbee.send(zbTx);
 }
+
 
 // WiFi Sense functions
 
@@ -68,6 +85,9 @@ int nothing_new = 0;
 clientinfo clients_known[MAX_CLIENTS_TRACKED];            // Array to save MACs of known CLIENTs
 int clients_known_count = 0;                              // Number of known CLIENTs
 
+
+
+// STORE Known APs
 
 int register_beacon(beaconinfo beacon)
 {
@@ -93,6 +113,8 @@ int register_beacon(beaconinfo beacon)
   return known;
 }
 
+//Store known clients
+
 int register_client(clientinfo ci)
 {
   int known = 0;   // Clear known flag
@@ -117,6 +139,8 @@ int register_client(clientinfo ci)
   return known;
 }
 
+// Print AP info on serial interface
+
 void print_beacon(beaconinfo beacon)
 {
   if (beacon.err != 0) {
@@ -129,28 +153,30 @@ void print_beacon(beaconinfo beacon)
   }
 }
 
+// PUBLISH/Print CLIENT INFO
+
 void print_client(clientinfo ci)
 {
   int u = 0;
+  byte message [7];
   int known = 0;   // Clear known flag
   if (ci.err != 0) {
     // nothing
   } else {
     Serial.printf("DEVICE: ");
     for (int i = 0; i < 6; i++) {
-      
-      //print detected MAC to console
-      Serial.printf("%02x", ci.station[i]);
-
-      // log detected MAC to XBEE next Payload
-      payload[i] = ci.station[i];
+          Serial.printf("%02x", ci.station[i]);
+          message[i] = ci.station[i];
     }
+     message[6] = ci.rssi;
     
     Serial.printf(" ==> ");
-
-    payload[6] = ci.rssi;
-    xbee.send(zbTx);
-    
+  
+    sendMessage("S1",message);
+   
+  
+    // Check connected AP data
+   
     for (u = 0; u < aps_known_count; u++)
     {
       if (! memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN)) {
@@ -171,6 +197,9 @@ void print_client(clientinfo ci)
     }
   }
 }
+
+
+// CALLBACK
 
 void promisc_cb(uint8_t *buf, uint16_t len)
 {
@@ -199,4 +228,5 @@ void promisc_cb(uint8_t *buf, uint16_t len)
     }
   }
 }
+
 

@@ -1,7 +1,4 @@
 // This #include statement was automatically added by the Particle IDE.
-#include <ArduinoJson.h>
-
-// This #include statement was automatically added by the Particle IDE.
 #include <XBee.h>
 
 // This #include statement was automatically added by the Particle IDE.
@@ -11,7 +8,7 @@
 XBee xbee = XBee();
 
 // payload array for xbee transmission
-byte payload[6] ;
+byte payload[15] ;
 
 // TX objects:
 
@@ -62,15 +59,21 @@ void loop() {
             // we got it (obviously) but sender didn't get an ACK
             Serial.println ("Sender didn't get an ACK");
         }
-        // Print Packet Containt
+        // Extract Packet Containt
             Serial.print ("Reported by:");
             Serial.println(rx.getRemoteAddress16(), HEX);
-            char rssi = (~rx.getData(6)+1);
-            int i = 0;
-            for (i=0;i<6;i++) Serial.print(rx.getData(i), HEX);
-            Serial.print (" with RSSI =");
-            Serial.println (-rssi, DEC);
-            Serial.println("---------------");
+
+            //int i = 0;
+            for (int i=0;i<15;i++) {
+                Serial.print(rx.getData(i));
+                Serial.print(".");
+                payload[i]=(rx.getData(i));
+            }
+
+            //char rssi = (~rx.getData(6)+1);
+            //Serial.println (-rssi, DEC);
+
+            Serial.println("\n");
 
       } else if (xbee.getResponse().getApiId() == MODEM_STATUS_RESPONSE) {
         xbee.getResponse().getModemStatusResponse(msr);
