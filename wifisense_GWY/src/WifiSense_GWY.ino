@@ -36,18 +36,39 @@
  ModemStatusResponse msr = ModemStatusResponse();
 
 
+// MQTT
+
+void callback(char* topic, byte* payload, unsigned int length);
+
+MQTT client("broker.mqttdashboard.com", 1883, callback);
+
+// recieve message
+void callback(char* topic, byte* payload, unsigned int length) {
+    char p[length + 1];
+    memcpy(p, payload, length);
+    p[length] = NULL;
+
+}
+
+
  void setup() {
 
      Serial.begin(9600);
      Serial1.begin(9600);
      xbee.setSerial(Serial1);
 
-     Serial.println ("Todo ok hasta aqui");
+     // connect to the MQTT server
+     client.connect("ivanlab_particle_1");
+
+     // publish/subscribe
+     if (client.isConnected()) {
+         client.publish("ivanlab/particle","Ivanlab_Particle 1 ON");
+         client.subscribe("inTopic/particle");
+     } else Serial.print("MQTT connection error");
 
  }
 
  void loop() {
-
 
     xbee.readPacket();
 
@@ -72,13 +93,34 @@
 
              //int i = 0;
              for (int i=0;i<15;i++) {
-                 Serial.print(rx.getData(i));
-                 Serial.print(".");
                  payload[i]=(rx.getData(i));
              }
 
-             //char rssi = (~rx.getData(6)+1);
-             //Serial.println (-rssi, DEC);
+            //Publish Payload to MQTT
+             if (!client.isConnected()) client.connect("ivanlab_particle_1");
+
+               char t1 = rx.getData(3);
+               char t2 = rx.getData(4);
+
+               String topic ="ivanlab/";
+               topic += t1;
+               topic += t2;
+               Serial.print ("Topic=");
+               Serial.println (topic);
+
+               String macString="";
+               for (int i=8;i<14;i++) macString+=String(rx.getData(i), HEX);
+
+               Serial.print ("mac=");
+               Serial.println (macString);
+               macString+=":";
+
+               char rssi = (~rx.getData(14)+1);
+               //Serial.println (-rssi, DEC);
+               macString+=String (-rssi, DEC);
+               Serial.println(macString);
+
+             client.publish(topic,macString);
 
              Serial.println("\n");
 
@@ -105,8 +147,9 @@
        Serial.println(xbee.getResponse().getErrorCode());
      }
 
+     if (client.isConnected())
+         client.loop();
 
-     delay(1000);
 
  }
 
