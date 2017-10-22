@@ -1,37 +1,27 @@
 /*
  * Project WifiSense_GWY
  * Description:
- * Author:
- * Date:
+ * Author: Ivan Padilla
+ * Date:2017.10
  */
 
- // This #include statement was automatically added by the Particle IDE.
  #include <XBee.h>
-
- // This #include statement was automatically added by the Particle IDE.
  #include <MQTT.h>
 
- // xbee object
  XBee xbee = XBee();
 
  // payload array for xbee transmission
  byte payload[15] ;
 
- // TX objects:
 
- // SH + SL Address of receiving XBee
+ // SH + SL Address of receiving XBee, case we need to send something
  XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40A945EC);
- //TX
  ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
- // TX Status Response
+
+ // XBEE TX Status Response
  ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 
- // Response Objects:
-
- //RX
- XBeeResponse response = XBeeResponse();
-
- //Response Status
+ //XBEE RX Message & Status
  ZBRxResponse rx = ZBRxResponse();
  ModemStatusResponse msr = ModemStatusResponse();
 
@@ -98,30 +88,28 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
             //Publish Payload to MQTT
              if (!client.isConnected()) client.connect("ivanlab_particle_1");
-
+               //Extract Topic from SN message
                char t1 = rx.getData(3);
                char t2 = rx.getData(4);
-
+               //Compose Topic String
                String topic ="ivanlab/";
                topic += t1;
                topic += t2;
                Serial.print ("Topic=");
                Serial.println (topic);
-
+               //Extract and compose Mac address from SN
                String macString="";
                for (int i=8;i<14;i++) macString+=String(rx.getData(i), HEX);
-
                Serial.print ("mac=");
                Serial.println (macString);
                macString+=":";
-
+               //Extract and add RSSI to the (mac) MQTT message payload
                char rssi = (~rx.getData(14)+1);
                //Serial.println (-rssi, DEC);
                macString+=String (-rssi, DEC);
                Serial.println(macString);
-
+               //Publish the MQTT payload
              client.publish(topic,macString);
-
              Serial.println("\n");
 
        } else if (xbee.getResponse().getApiId() == MODEM_STATUS_RESPONSE) {
@@ -146,22 +134,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
        Serial.print("Error reading packet.  Error code: ");
        Serial.println(xbee.getResponse().getErrorCode());
      }
-
+     //Check if there is any downstream MQTT message for me
      if (client.isConnected())
          client.loop();
-
-
- }
-
- void flashLed(int pin, int times, int wait) {
-
-   for (int i = 0; i < times; i++) {
-     digitalWrite(pin, HIGH);
-     delay(wait);
-     digitalWrite(pin, LOW);
-
-     if (i + 1 < times) {
-       delay(wait);
-     }
-   }
  }
