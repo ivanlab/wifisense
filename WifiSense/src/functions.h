@@ -1,5 +1,7 @@
-
-
+// based on Ray Burnette 20161013 work ( using Arduino 1.6.12 )
+// added XBEE transport by Ivan Padilla 20171001
+// added MQTT-SN encapsulation by Ivan Padilla 20171001
+//
 
 // This-->tab == "functions.h"
 
@@ -58,7 +60,7 @@ void sendMessage(const char topic[2], byte message[7], bool retain=false)
   for (int i=8;i<15;i++){
     payload[i] = message[i-8];
     //Serial.print(payload[i],HEX);
-  
+
   }
 
   for (int i=0; i<8; i++){
@@ -72,7 +74,7 @@ void sendMessage(const char topic[2], byte message[7], bool retain=false)
   }
 
   Serial.print ((payload[14]), DEC);
-  
+
   xbee.send(zbTx);
 }
 
@@ -169,14 +171,14 @@ void print_client(clientinfo ci)
           message[i] = ci.station[i];
     }
      message[6] = ci.rssi;
-    
+
     Serial.printf(" ==> ");
-  
+
     sendMessage("S1",message);
-   
-  
+
+
     // Check connected AP data
-   
+
     for (u = 0; u < aps_known_count; u++)
     {
       if (! memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN)) {
@@ -228,5 +230,3 @@ void promisc_cb(uint8_t *buf, uint16_t len)
     }
   }
 }
-
-
