@@ -16,7 +16,7 @@ extern "C" {
 
 #include <WiFi.h>
 #include <XBee.h>
-#include <Printers.h>
+//#include <Printers.h>
 #include "./structures.h"
 
 
