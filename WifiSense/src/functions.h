@@ -63,17 +63,17 @@ void sendMessage(const char topic[2], byte message[7], bool retain=false)
 
   }
 
-  for (int i=0; i<8; i++){
-    Serial.print (payload[i]);
-    Serial.print (".");
-  }
+  //for (int i=0; i<8; i++){
+  //  Serial.print (payload[i]);
+  //  Serial.print (".");
+  //}
 
-  for (int i=8;i<14;i++){
-    Serial.print(payload[i],HEX);
-    Serial.print (":");
-  }
+  //for (int i=8;i<14;i++){
+  //  Serial.print(payload[i],HEX);
+  //  Serial.print (":");
+  //}
 
-  Serial.print ((payload[14]), DEC);
+  //Serial.print ((payload[14]), DEC);
 
   xbee.send(zbTx);
 }
@@ -87,6 +87,7 @@ int nothing_new = 0;
 clientinfo clients_known[MAX_CLIENTS_TRACKED];            // Array to save MACs of known CLIENTs
 int clients_known_count = 0;                              // Number of known CLIENTs
 
+unsigned long time = millis();
 
 
 // STORE Known APs
@@ -120,6 +121,17 @@ int register_beacon(beaconinfo beacon)
 int register_client(clientinfo ci)
 {
   int known = 0;   // Clear known flag
+  //Serial.print(millis());
+  //Serial.printf("%s","-" );
+  //Serial.println(time);
+
+// Clear known clients every minute
+
+  if (millis()-time > 60000) {
+    clients_known_count = 0;
+    time = millis();
+  }
+
   for (int u = 0; u < clients_known_count; u++)
   {
     if (! memcmp(clients_known[u].station, ci.station, ETH_MAC_LEN)) {

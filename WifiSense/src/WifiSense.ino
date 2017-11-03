@@ -1,19 +1,17 @@
-// based on Ray Burnette 20161013 work ( using Arduino 1.6.12 )
+// based on Ray Burnette 20161013 work
 // added XBEE transport by Ivan Padilla 20171001
 // added MQTT-SN encapsulation by Ivan Padilla 20171001
 
 
+#include <SPI.h>
 #include <WiFi.h>
 #include <XBee.h>
 #include "./functions.h"
 
 #define disable 0
 #define enable  1
-// uint8_t channel = 1;
-unsigned int channel = 1;
 
-//int statusLed = 2;
-//int errorLed = 2;
+unsigned int channel = 1;
 
 
 void setup() {

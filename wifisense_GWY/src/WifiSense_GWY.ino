@@ -33,7 +33,7 @@
 
 void callback(char* topic, byte* payload, unsigned int length);
 
-MQTT client("broker.mqttdashboard.com", 1883, callback);
+MQTT client("ivanlab.org", 1883, callback);
 
 // recieve message
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -166,6 +166,8 @@ JsonObject& root = jsonBuffer.createObject();
                uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
                Serial.print ("TimeStamp UNIX = ");
                Serial.println(String(now_time));
+               Serial.print ("TimeStamp SPARK = ");
+               Serial.println(String(currentTime));               
 
                // Get GPS position
                char longitude[7];
