@@ -147,8 +147,13 @@ JsonObject& root = jsonBuffer.createObject();
                String macString="";
                char mac[18];
                for (int i=8;i<14;i++) {
-                 macString+=String(rx.getData(i), HEX);
-                 macString+=":";
+                   if (rx.getData(i)>9) {
+                     macString+=String(rx.getData(i), HEX);
+                 } else {
+                   macString+="0";
+                   macString+=String(rx.getData(i), HEX);
+                 }
+               macString+=":";
                }
                macString.toCharArray(mac,18);
                Serial.print ("mac = ");
