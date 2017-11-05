@@ -39,7 +39,7 @@ XBee xbee = XBee();
 
 void sendMessage(const char topic[2], byte message[15], bool retain=false)
 {
-  uint8_t payload[23];
+  uint8_t payload[24];
 
   XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40a6a3ee);
   ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
@@ -57,7 +57,7 @@ void sendMessage(const char topic[2], byte message[15], bool retain=false)
   payload[6] = 0x00;  // message ID Low
   payload[7] = 0x07;  // size of header
 
-  for (int i=8;i<15;i++){
+  for (int i=8;i<24;i++){
     payload[i] = message[i-8];
     //memcpy();
   }
@@ -202,7 +202,7 @@ void print_client(clientinfo ci)
         for (int i=0;i<4;i++)Serial.print(message[7+i], HEX);
         Serial.print("->");
         Serial.print(longitude.asFloat);
-        
+
 
         Serial.print(",lat=" );
         for (int i=0;i<4;i++)Serial.print(message[11+i], HEX);

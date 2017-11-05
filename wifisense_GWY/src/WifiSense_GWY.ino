@@ -4,7 +4,7 @@
  * Author: Ivan Padilla
  * Date:2017.10
  */
- 
+
 
  #include <XBee.h>
  #include <MQTT.h>
@@ -24,7 +24,7 @@ SerialLogHandler logHandler;
  XBee xbee = XBee();
 
  // payload array for xbee transmission
- byte payload[15] ;
+ byte payload[24] ;
 
 
  // SH + SL Address of receiving XBee, case we need to send something
@@ -125,9 +125,10 @@ JsonObject& root = jsonBuffer.createObject();
              Serial.print ("Source sensor = ");
              Serial.println(remoteSensorString);
 
-             for (int i=0;i<15;i++) {
+             /*for (int i=0;i<24;i++) {
                  payload[i]=(rx.getData(i));
              }
+             */
 
             //Build Payload > JSON & Publish to MQTT
              if (!client.isConnected()) client.connect("ivanlab_particle_1");
@@ -153,7 +154,7 @@ JsonObject& root = jsonBuffer.createObject();
                Serial.print ("mac = ");
                Serial.println (macString);
 
-               // 3 - Extract and add RSSI to the (mac) MQTT message payload
+               // 3 - Extract and add RSSI
                char rssi = (~rx.getData(14)+1);
                char rssiChar[4];
                String rssiString = String (-(rssi), DEC);
@@ -161,7 +162,7 @@ JsonObject& root = jsonBuffer.createObject();
                Serial.print ("RSSI = ");
                Serial.println(rssiString);
 
-               //Get the Timestamp - NTP
+               /*Get the Timestamp - NTP
                currentTime = rtc.now();
                timeStr = rtc.yearString(currentTime);
                timeStr+="-";
@@ -179,27 +180,46 @@ JsonObject& root = jsonBuffer.createObject();
                Serial.println(timeStr);
                char timeChar[26];
                timeStr.toCharArray(timeChar,26);
+               */
 
-               // Get the timestamp - Particle.Time
-               uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
+               // Get the timestamp - Particle.Time -> UNIX
+               //uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
+               uint32_t now_time = rtc.now() - 2208988803; // 70 years in seconds, including leap yeas
                Serial.print ("TimeStamp UNIX = ");
                Serial.println(String(now_time));
-               Serial.print ("TimeStamp SPARK = ");
-               Serial.println(String(currentTime));
+               //Serial.print ("TimeStamp SPARK = ");
+               //Serial.println(String(currentTime));
 
-               // Get GPS position
-               char longitude[7];
-               char latitude[7];
-               String lon = String(5.1234);
-               String lat = String(41.1234);
-               lon.toCharArray(longitude,7);
-               lat.toCharArray(latitude,7);
+               // Extract GPS position
+               char longitude[9];
+               char latitude[9];
+
+               union {
+                byte asBytes[4];
+                float asFloat;
+              } longi;
+
+              union {
+                byte asBytes[4];
+                float asFloat;
+              } lati;
+
+              for(int i=15;i<19;i++) {
+                longi.asBytes[i-15]=rx.getData(i);
+              }
+              for(int i=19;i<23;i++) {
+                lati.asBytes[i-19]=rx.getData(i);
+              }
+
+               String lon = String(longi.asFloat,4);
+               String lat = String(lati.asFloat,4);
+               lon.toCharArray(longitude,9);
+               lat.toCharArray(latitude,9);
+
                Serial.print ("Position = ");
                Serial.print (lon);
                Serial.print (",");
                Serial.println (lat);
-
-
 
                //Encapsulate in JSON
                {
@@ -251,6 +271,7 @@ JsonObject& root = jsonBuffer.createObject();
          client.loop();
  }
 
+/*
  time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
 {
   struct tm t;
@@ -264,3 +285,4 @@ JsonObject& root = jsonBuffer.createObject();
   time_t t_of_day = mktime(&t);
   return t_of_day;
 }
+*/
