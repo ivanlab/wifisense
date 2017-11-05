@@ -4,11 +4,21 @@
  * Author: Ivan Padilla
  * Date:2017.10
  */
+ 
 
  #include <XBee.h>
  #include <MQTT.h>
  #include <ArduinoJson.h>
  #include <SparkTime.h>
+ #include <Particle.h>
+ #include <CellularHelper.h>
+
+ // Set your 3rd-party SIM APN here
+ // https://docs.particle.io/reference/firmware/electron/#setcredentials-
+ //STARTUP(cellular_credentials_set("isp.mymeteor.ie", "my", "isp", NULL));
+ STARTUP(cellular_credentials_set("internet", "", "", NULL));
+
+SerialLogHandler logHandler;
 
 
  XBee xbee = XBee();
@@ -59,6 +69,14 @@ JsonObject& root = jsonBuffer.createObject();
      // Serial for Debug, Serial1 for Xbee
      Serial.begin(9600);
      Serial1.begin(9600);
+
+     Log.info("manufacturer=%s", CellularHelper.getManufacturer().c_str());
+     Log.info("model=%s", CellularHelper.getModel().c_str());
+     Log.info("firmware version=%s", CellularHelper.getFirmwareVersion().c_str());
+     Log.info("ordering code=%s", CellularHelper.getOrderingCode().c_str());
+     Log.info("IMEI=%s", CellularHelper.getIMEI().c_str());
+     Log.info("IMSI=%s", CellularHelper.getIMSI().c_str());
+     Log.info("ICCID=%s", CellularHelper.getICCID().c_str());
 
      // RTC
      rtc.begin(&UDPClient, "0.pool.ntp.org");
@@ -167,7 +185,7 @@ JsonObject& root = jsonBuffer.createObject();
                Serial.print ("TimeStamp UNIX = ");
                Serial.println(String(now_time));
                Serial.print ("TimeStamp SPARK = ");
-               Serial.println(String(currentTime));               
+               Serial.println(String(currentTime));
 
                // Get GPS position
                char longitude[7];

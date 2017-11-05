@@ -37,15 +37,15 @@ XBee xbee = XBee();
 
 // MQTT-SN Encapsulation
 
-void sendMessage(const char topic[2], byte message[7], bool retain=false)
+void sendMessage(const char topic[2], byte message[15], bool retain=false)
 {
-  uint8_t payload[15];
+  uint8_t payload[23];
 
   XBeeAddress64 addr64 = XBeeAddress64(0x0013a200, 0x40a6a3ee);
   ZBTxRequest zbTx = ZBTxRequest(addr64, payload, sizeof(payload));
   ZBTxStatusResponse txStatus = ZBTxStatusResponse();
 
-  payload[0] = 15; // header +sizeof message
+  payload[0] = 24; // header +sizeof message
   payload[1] = MQTT_SN_TYPE_PUBLISH;
   payload[2] = MQTT_SN_FLAG_QOS_N1 | MQTT_SN_TOPIC_TYPE_SHORT;
   if (retain) {
@@ -59,24 +59,16 @@ void sendMessage(const char topic[2], byte message[7], bool retain=false)
 
   for (int i=8;i<15;i++){
     payload[i] = message[i-8];
-    //Serial.print(payload[i],HEX);
-
+    //memcpy();
   }
-
-  //for (int i=0; i<8; i++){
-  //  Serial.print (payload[i]);
-  //  Serial.print (".");
-  //}
-
-  //for (int i=8;i<14;i++){
-  //  Serial.print(payload[i],HEX);
-  //  Serial.print (":");
-  //}
-
-  //Serial.print ((payload[14]), DEC);
 
   xbee.send(zbTx);
 }
+
+// Get GPS position
+
+float lon = 3.1234;
+float lat = 41.1234;
 
 
 // WiFi Sense functions
@@ -88,6 +80,7 @@ clientinfo clients_known[MAX_CLIENTS_TRACKED];            // Array to save MACs 
 int clients_known_count = 0;                              // Number of known CLIENTs
 
 unsigned long time = millis();
+
 
 
 // STORE Known APs
@@ -167,12 +160,12 @@ void print_beacon(beaconinfo beacon)
   }
 }
 
-// PUBLISH/Print CLIENT INFO
+// Get/PUBLISH/Print CLIENT INFO
 
 void print_client(clientinfo ci)
 {
   int u = 0;
-  byte message [7];
+  byte message [7+8];
   int known = 0;   // Clear known flag
   if (ci.err != 0) {
     // nothing
@@ -185,6 +178,42 @@ void print_client(clientinfo ci)
      message[6] = ci.rssi;
 
     Serial.printf(" ==> ");
+
+    //add GPS to payload
+
+    for (int i=0;i<4;i++) message[7+i] = (*((int*)&lon) >> 8 * i) & 0xFF;
+    for (int i=0;i<4;i++) message[11+i] = (*((int*)&lat) >> 8 * i) & 0xFF;
+
+    union {
+      byte asBytes[4];
+      float asFloat;
+    } longitude;
+
+    union {
+      byte asBytes[4];
+      float asFloat;
+    } latitude;
+
+      for (int i=0;i<4;i++)longitude.asBytes[i]=message[7+i];
+      for (int i=0;i<4;i++)latitude.asBytes[i]=message[11+i];
+
+
+        Serial.print("lon=" );
+        for (int i=0;i<4;i++)Serial.print(message[7+i], HEX);
+        Serial.print("->");
+        Serial.print(longitude.asFloat);
+        
+
+        Serial.print(",lat=" );
+        for (int i=0;i<4;i++)Serial.print(message[11+i], HEX);
+        Serial.print("->");
+        Serial.print(latitude.asFloat);
+        Serial.println("");
+
+
+    for (int i=7; i<15; i++) Serial.print(message[i],HEX);
+
+    //PUBLISH
 
     sendMessage("S1",message);
 
@@ -211,7 +240,6 @@ void print_client(clientinfo ci)
     }
   }
 }
-
 
 // CALLBACK
 
