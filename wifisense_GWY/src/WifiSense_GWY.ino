@@ -12,16 +12,15 @@
  #include <SparkTime.h>
  #include <Particle.h>
  #include <CellularHelper.h>
+ #include <google-maps-device-locator.h>
 
  // Set your 3rd-party SIM APN here
  // https://docs.particle.io/reference/firmware/electron/#setcredentials-
  //STARTUP(cellular_credentials_set("isp.mymeteor.ie", "my", "isp", NULL));
  STARTUP(cellular_credentials_set("internet", "", "", NULL));
-
-SerialLogHandler logHandler;
-
-
- XBee xbee = XBee();
+  GoogleMapsDeviceLocator locator;
+  SerialLogHandler logHandler;
+  XBee xbee = XBee();
 
  // payload array for xbee transmission
  byte payload[24] ;
@@ -69,6 +68,7 @@ JsonObject& root = jsonBuffer.createObject();
      // Serial for Debug, Serial1 for Xbee
      Serial.begin(9600);
      Serial1.begin(9600);
+     locator.withLocatePeriodic(30);
 
      Log.info("manufacturer=%s", CellularHelper.getManufacturer().c_str());
      Log.info("model=%s", CellularHelper.getModel().c_str());
@@ -245,6 +245,7 @@ JsonObject& root = jsonBuffer.createObject();
                  char jsonChar[200];
                  root.printTo(jsonChar);
                  client.publish(topic,jsonChar);
+                 Particle.publish("wifisense",jsonChar);
                }
 
             Serial.println("\n");
