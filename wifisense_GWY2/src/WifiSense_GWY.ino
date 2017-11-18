@@ -3,6 +3,7 @@
  * Description:
  * Author: Ivan Padilla
  * Date:2017.10
+ *
  */
 
 
@@ -34,7 +35,9 @@ FuelGauge fuel;
 
 int keepalive = 5;
 void callback(char* topic, byte* payload, unsigned int length);
-MQTT client("broker.mqttdashboard.com", 1883, keepalive, callback);
+//MQTT client("broker.mqttdashboard.com", 1883, keepalive, callback);
+MQTT client("ivanlab.org", 1883, keepalive, callback);
+
 // recieve message
 void callback(char* topic, byte* payload, unsigned int length) {
     char p[length + 1];
@@ -70,16 +73,26 @@ JsonObject& root = jsonBuffer.createObject();
 
       Serial.print("Battery level: ");
       Serial.print(getBatteryLife("get"));
-      Serial.println(" % ");
+      Serial.println(" percent");
+      Particle.publish("Battery level: ");
+      Particle.publish(String(batteryLife));
+      Particle.publish(String(fuel.getVCell()) + "V");
+
 
      // MQTT
      client.connect("ivanlab_particle_1");
 
      if (client.isConnected()) {
-         client.publish  ("ivanlab/particle_gwy","Gateway_Particle 1 Connected!");
+         client.publish  ("ivanlab/particle_gwy","Particle-1 Connected to MQTT");
          client.subscribe("ivanlab/particle_gwy");
+         client.publish  ("ivanlab/particle_gwy","Battery level: ");
+         client.publish  ("ivanlab/particle_gwy",String (batteryLife));
          Serial.println("MQTT Up");
-     } else Serial.print ("MQTT connection error");
+         Particle.publish("MQTT Connection UP");
+     } else {
+       Serial.print ("MQTT connection error");
+       Particle.publish("MQTT Connection ERROR");
+     }
      Serial.print ("keepalive: ");
      Serial.println(keepalive);
 
