@@ -20,20 +20,36 @@ int positioned = 0;
 
 void setup() {
 
-  Serial.begin(57600);    // Console debug
+  Serial.begin(115200);    // Console debug
   Serial1.begin(9600);    // Link to Particle LTE
   ss.begin(GPSBaud);      // Link to GPS
   pinMode(14, OUTPUT);    // GPS chip enable pin
   digitalWrite(14, LOW);  // Shut down GPS for now...
   pinMode(15, INPUT);     // GPS reading indicator
-  delay (3000);           // Estabilize GPS - 3 seconds OFF
-
-  //Config to be sent to GPS
-  //byte gpsConfig[22]={0xB5,0x62,0x06,0x08,0x06,0x00,0x20,0x4E,0x01,0x00,0x01,0x00,0x84,0x00,0xB5,0x62,0x06,0x08,0x00,0x00,0x0E,0x30};
-  //ss.write(gpsConfig, 22);
-
   Serial.printf("\n\nSDK version:%s\n\r", system_get_sdk_version());
   Serial.println(F("ESP8266 mini-sniff - MQTT version"));
+  Serial.println(TinyGPSPlus::libraryVersion());
+  delay (3000);           // Estabilize GPS - 3 seconds OFF
+  digitalWrite(14, HIGH); // Turn ON GPS
+
+  do {
+        Serial.print("Reading GPS: Satellites->"); Serial.println(gps.satellites.value());
+        readGps(500);
+        delay (1);
+          if (gps.location.lat()!=0){
+            lat=gps.location.lat();
+            lon=gps.location.lng();
+            Serial.print("Position: ");
+            Serial.print(lon);
+            Serial.print("/");
+            Serial.println(lat);
+            break;
+          }
+      } while (millis() - gpsTimer < 300e3);
+
+        digitalWrite(14, LOW);
+
+
 
   // Define WiFi scanning parameters
   wifi_set_opmode(STATION_MODE);            // Promiscuous works only with station mode
@@ -42,7 +58,6 @@ void setup() {
   wifi_set_promiscuous_rx_cb(promisc_cb);   // Set up promiscuous callback
   wifi_promiscuous_enable(enable);
 
-  digitalWrite(14, HIGH); // Turn ON GPS
 }
 
 void loop() {
@@ -58,29 +73,5 @@ void loop() {
       wifi_set_channel(channel);
     }
     delay(1);                         // critical processing timeslice for NONOS SDK! No delay(0) yield()
-
-    if (digitalRead(15)==HIGH) {      // Read GPS when data is (HW) available
-      Serial.println("Reading GPS...");
-      readGps(500);
-      if (gps.location.lat()!=0) lat=gps.location.lat();
-      if (gps.location.lng()!=0) lon=gps.location.lng();
-        if(gps.location.lat()!=0){
-        Serial.print("Position: ");
-        Serial.print(lon);
-        Serial.print("/");
-        Serial.print(lat);
-        Serial.print("-");
-        Serial.println(positioned);
-        positioned++;
-      }
-    }
-    // Turn OFF GPS after 10 valid readings
-    if (positioned>10){
-      digitalWrite(14, LOW);
-      positioned=0;
-    }
-    // After an hour, wake up GPS to recheck position
-    if (millis()-gpsTimer>3600e3) digitalWrite (14, HIGH);
-
   }
 }

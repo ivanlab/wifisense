@@ -63,6 +63,8 @@ JsonObject& root = jsonBuffer.createObject();
      Serial.begin(9600);
      Serial1.begin(9600);
      locator.withLocatePeriodic(30);
+     pinMode(D6, OUTPUT);
+     digitalWrite(D6, HIGH);
 
      Serial.println("Particle Up");
 
@@ -96,6 +98,10 @@ JsonObject& root = jsonBuffer.createObject();
      Serial.print ("keepalive: ");
      Serial.println(keepalive);
 
+     digitalWrite(D6, LOW);
+     delay(100);
+     digitalWrite(D6, HIGH);
+
  }
 
  void loop() {
@@ -103,6 +109,7 @@ JsonObject& root = jsonBuffer.createObject();
   recvWithStartEndMarkers();
   publishNewData();
   client.loop();
+
   if (!client.isConnected()) {
     client.connect("ivanlab_particle_1");
     Serial.print("...reconnecting MQTT");
@@ -182,17 +189,14 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
 void publishNewData(){
 
   if (newData == true) {
-    //Serial.print("MQTT Connected? ");
-    //Serial.println(client.isConnected());
      // 1 - Extract Topic from SN message
      char t1 = receivedChars[3];
      char t2 = receivedChars[4];
+
      //Compose Topic String
      String topic ="ivanlab/";
      topic += t1;
      topic += t2;
-     //Serial.print ("Topic = ");
-     //Serial.println (topic);
 
      // 2 - Extract and compose Mac address from SN
      String macString="";
@@ -207,16 +211,12 @@ void publishNewData(){
      macString+=":";
      }
      macString.toCharArray(mac,18);
-     //Serial.print ("mac = ");
-     //Serial.println (macString);
 
      // 3 - Extract and add RSSI
      char rssi = (~receivedChars[14]+1);
      char rssiChar[4];
      String rssiString = String (-(rssi), DEC);
      rssiString.toCharArray(rssiChar,4);
-     //Serial.print ("RSSI = ");
-     //Serial.println(rssiString);
 
      // Get the timestamp - Particle.Time -> UNIX
      uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
