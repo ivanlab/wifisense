@@ -25,7 +25,6 @@ void setup() {
   ss.begin(GPSBaud);      // Link to GPS
   pinMode(14, OUTPUT);    // GPS chip enable pin
   digitalWrite(14, LOW);  // Shut down GPS for now...
-  pinMode(15, INPUT);     // GPS reading indicator
   Serial.printf("\n\nSDK version:%s\n\r", system_get_sdk_version());
   Serial.println(F("ESP8266 mini-sniff - MQTT version"));
   Serial.println(TinyGPSPlus::libraryVersion());
