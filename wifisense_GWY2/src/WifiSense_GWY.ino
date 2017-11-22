@@ -169,6 +169,8 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
 
 // Read Serial line and publish new data if exists
 void publishNewData(){
+  // Get the timestamp - Particle.Time -> UNIX
+  uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
   if (newData == true) {
     for (int i=0; i<24;i++) Serial.print(receivedChars[i], HEX);
     Serial.println();
@@ -180,72 +182,87 @@ void publishNewData(){
      topic += t1;
      topic += t2;
 
-     // 2 - Extract Mac address from SN
-     String macString="";
-     char mac[18];
-     for (int i=8;i<14;i++) {
-         if (receivedChars[i]>9) {
+     if(t1=="S"){       //if Message is written to the DATA topic
+
+       // 2 - Extract Mac address from SN
+       String macString="";
+       char mac[18];
+       for (int i=8;i<14;i++) {
+           if (receivedChars[i]>9) {
+             macString+=String(receivedChars[i], HEX);
+         } else {
+           macString+="0";
            macString+=String(receivedChars[i], HEX);
-       } else {
-         macString+="0";
-         macString+=String(receivedChars[i], HEX);
+         }
+       macString+=":";
        }
-     macString+=":";
-     }
-     macString.toCharArray(mac,18);
+       macString.toCharArray(mac,18);
 
-     // 3 - Extract RSSI
-     char rssi = (~receivedChars[14]+1);
-     char rssiChar[4];
-     String rssiString = String (-(rssi), DEC);
-     rssiString.toCharArray(rssiChar,4);
+       // 3 - Extract RSSI
+       char rssi = (~receivedChars[14]+1);
+       char rssiChar[4];
+       String rssiString = String (-(rssi), DEC);
+       rssiString.toCharArray(rssiChar,4);
 
-     // Get the timestamp - Particle.Time -> UNIX
-     uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
+       // Extract GPS position
+       char longitude[9];
+       char latitude[9];
 
-     // Extract GPS position
-     char longitude[9];
-     char latitude[9];
+       union {
+        byte asBytes[4];
+        float asFloat;
+      } longi;
 
-     union {
-      byte asBytes[4];
-      float asFloat;
-    } longi;
+      union {
+        byte asBytes[4];
+        float asFloat;
+      } lati;
 
-    union {
-      byte asBytes[4];
-      float asFloat;
-    } lati;
+      for(int i=15;i<19;i++) {
+        longi.asBytes[i-15]=receivedChars[i];
+      }
+      for(int i=19;i<23;i++) {
+        lati.asBytes[i-19]=receivedChars[i];
+      }
 
-    for(int i=15;i<19;i++) {
-      longi.asBytes[i-15]=receivedChars[i];
-    }
-    for(int i=19;i<23;i++) {
-      lati.asBytes[i-19]=receivedChars[i];
-    }
+       String lon = String(longi.asFloat,4);
+       String lat = String(lati.asFloat,4);
+       lon.toCharArray(longitude,9);
+       lat.toCharArray(latitude,9);
 
-     String lon = String(longi.asFloat,4);
-     String lat = String(lati.asFloat,4);
-     lon.toCharArray(longitude,9);
-     lat.toCharArray(latitude,9);
+     //Encapsulate in JSON
+      {
+       StaticJsonBuffer<200> jsonBuffer;
+       JsonObject& root = jsonBuffer.createObject();
+       root["sensor"] = 1;
+       root["timestamp"] = now_time;
+       root["lon"] = longitude;
+       root["lat"] = latitude;
+       root["mac"] = mac;
+       root["rssi"] = rssiChar;
+       //root.prettyPrintTo(Serial);
 
-   //Encapsulate in JSON
-    {
-     StaticJsonBuffer<300> jsonBuffer;
-     JsonObject& root = jsonBuffer.createObject();
-     root["sensor"] = 1;
-     root["timestamp"] = now_time;
-     root["lon"] = longitude;
-     root["lat"] = latitude;
-     root["mac"] = mac;
-     root["rssi"] = rssiChar;
-     //root.prettyPrintTo(Serial);
+       //Publish the MQTT payload
+       char jsonChar[200];
+       root.printTo(jsonChar);
+       client.publish(topic,jsonChar);
+       Particle.publish("wifisense",jsonChar);
+      }
+    }else{
+      if(t1=="C"){
+        StaticJsonBuffer<200> jsonBuffer;
+        JsonObject& root = jsonBuffer.createObject();
+        root["sensor"] = 1;
+        root["timestamp"] = now_time;
+        root["Message"] = receivedChars;
+        //root.prettyPrintTo(Serial);
 
-     //Publish the MQTT payload
-     char jsonChar[200];
-     root.printTo(jsonChar);
-     client.publish(topic,jsonChar);
-     Particle.publish("wifisense",jsonChar);
+        //Publish the MQTT payload
+        char jsonChar[200];
+        root.printTo(jsonChar);
+        client.publish(topic,jsonChar);
+        Particle.publish("wifisense",jsonChar);
+      }
     }
    newData = false;
   }

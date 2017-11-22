@@ -8,7 +8,6 @@
 #include <TinyGPS++.h>                                  // Tiny GPS Plus Library
 #include <SoftwareSerial.h>
 #include "./functions2.h"
-
 #define disable 0
 #define enable  1
 
@@ -23,32 +22,33 @@ void setup() {
   Serial.begin(115200);    // Console debug
   Serial1.begin(9600);    // Link to Particle LTE
   ss.begin(GPSBaud);      // Link to GPS
-  pinMode(14, OUTPUT);    // GPS chip enable pin
-  digitalWrite(14, LOW);  // Shut down GPS for now...
   Serial.printf("\n\nSDK version:%s\n\r", system_get_sdk_version());
   Serial.println(F("ESP8266 mini-sniff - MQTT version"));
   Serial.println(TinyGPSPlus::libraryVersion());
+
+  pinMode(14, OUTPUT);    // GPS chip enable pin
+  digitalWrite(14, LOW);  // Shut down GPS for now...
   delay (3000);           // Estabilize GPS - 3 seconds OFF
   digitalWrite(14, HIGH); // Turn ON GPS
 
-  do {
-        Serial.print("Reading GPS: Satellites->"); Serial.println(gps.satellites.value());
-        readGps(500);
-        delay (1);
-          if (gps.location.lat()!=0){
-            lat=gps.location.lat();
-            lon=gps.location.lng();
-            Serial.print("Position: ");
-            Serial.print(lon);
-            Serial.print("/");
-            Serial.println(lat);
-            break;
-          }
-      } while (millis() - gpsTimer < 300e3);
+  do {                    // Try to get a GPS position fix in less than 5 mins
+      Serial.print("Reading GPS: Satellites->"); Serial.println(gps.satellites.value());
+      readGps(500);
+      delay (1);
+        if (gps.location.lat()!=0){
+          lat=gps.location.lat();
+          lon=gps.location.lng();
+          Serial.print("Position: ");
+          Serial.print(lon);
+          Serial.print("/");
+          Serial.println(lat);
+          break;
+        }
+    } while (millis() - gpsTimer < 300e3);
+    if(lat==0)
+      Serial.print("Unable to get GPS fix - Available Sats: "+gps.satellites.value());
 
-        digitalWrite(14, LOW);
-
-
+    digitalWrite(14, LOW);  // Turn OFF GPS
 
   // Define WiFi scanning parameters
   wifi_set_opmode(STATION_MODE);            // Promiscuous works only with station mode
