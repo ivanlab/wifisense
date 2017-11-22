@@ -30,24 +30,30 @@ void setup() {
   digitalWrite(14, LOW);  // Shut down GPS for now...
   delay (3000);           // Estabilize GPS - 3 seconds OFF
   digitalWrite(14, HIGH); // Turn ON GPS
+  byte message[15]="Searching GPS";
+  sendMessage("C1", message);
 
   do {                    // Try to get a GPS position fix in less than 5 mins
       Serial.print("Reading GPS: Satellites->"); Serial.println(gps.satellites.value());
       readGps(500);
       delay (1);
-        if (gps.location.lat()!=0){
+        if (gps.location.lat()!=0 && gps.location.lng()!=0){
           lat=gps.location.lat();
           lon=gps.location.lng();
           Serial.print("Position: ");
           Serial.print(lon);
           Serial.print("/");
           Serial.println(lat);
+          byte message[15]="GPS fix rcvd";
+          sendMessage("C1", message);
           break;
         }
     } while (millis() - gpsTimer < 300e3);
-    if(lat==0)
+    if(lat==0){
+      byte message[15]="No GPS fix";
+      sendMessage("C1", message);
       Serial.print("Unable to get GPS fix - Available Sats: "+gps.satellites.value());
-
+    }
     digitalWrite(14, LOW);  // Turn OFF GPS
 
   // Define WiFi scanning parameters

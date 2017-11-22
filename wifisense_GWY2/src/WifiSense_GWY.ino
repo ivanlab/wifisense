@@ -169,9 +169,10 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
 
 // Read Serial line and publish new data if exists
 void publishNewData(){
-  // Get the timestamp - Particle.Time -> UNIX
-  uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
   if (newData == true) {
+    // Get the timestamp - Particle.Time -> UNIX
+    uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
+    // print received message through console
     for (int i=0; i<24;i++) Serial.print(receivedChars[i], HEX);
     Serial.println();
 
@@ -182,7 +183,10 @@ void publishNewData(){
      topic += t1;
      topic += t2;
 
-     if(t1=="S"){       //if Message is written to the DATA topic
+     Serial.print("topic=");
+     Serial.println(t1);
+
+     if(t1=='S'){       //if Message is written to the DATA topic
 
        // 2 - Extract Mac address from SN
        String macString="";
@@ -248,14 +252,18 @@ void publishNewData(){
        client.publish(topic,jsonChar);
        Particle.publish("wifisense",jsonChar);
       }
-    }else{
-      if(t1=="C"){
+    }else{                                // it is a control message?
+      if(t1=='C'){
+        char message[15];
+        for (int i=8; i<23;i++) message[i-8]=receivedChars[i];
+        message[23]='/n';
+        Serial.print(message);
         StaticJsonBuffer<200> jsonBuffer;
         JsonObject& root = jsonBuffer.createObject();
         root["sensor"] = 1;
         root["timestamp"] = now_time;
-        root["Message"] = receivedChars;
-        //root.prettyPrintTo(Serial);
+        root["Message"] = message;
+        root.prettyPrintTo(Serial);
 
         //Publish the MQTT payload
         char jsonChar[200];
