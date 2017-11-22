@@ -35,8 +35,8 @@ unsigned long time = millis();                    // Counter to reset client cou
 #define MQTT_SN_TOPIC_TYPE_SHORT      (0x02)
 
 // GPS Initialization Parameters
-static float lon = -6.0674;
-static float lat = 37.3476;
+static float lon = 0.0;
+static float lat = 0.0;
 TinyGPSPlus gps;                            //Create a GPS object
 static const int RXPin = 12, TXPin = 13;    // Ublox  GPS module to pins 12 and 13
 SoftwareSerial ss(RXPin, TXPin);            // The serial connection to the GPS device
@@ -66,6 +66,7 @@ void sendMessage(const char topic[2], byte message[15], bool retain=false)
   payload[6] = 0x00;                  // message ID Low
   payload[7] = 0x07;                  // size of header
 
+  Serial.print("Topic= "); Serial.print(topic[0]); Serial.print("-");
   // Load the message in the MQTT-SN payload
     for (int i=8;i<24;i++){
       payload[i] = message[i-8];
@@ -167,56 +168,10 @@ void print_client(clientinfo ci)
 
     sendMessage("S1",message);
 
-    /*                  // Log position as contained in message for debbuging purposes
-    union {             // Union to read Bytes as Float
-      byte asBytes[4];
-      float asFloat;
-    } longitude;
-
-    union {
-      byte asBytes[4];
-      float asFloat;
-    } latitude;
-
-      for (int i=0;i<4;i++)longitude.asBytes[i]=message[7+i];
-      for (int i=0;i<4;i++)latitude.asBytes[i]=message[11+i];
-
-        Serial.print("lon=" );
-        for (int i=0;i<4;i++)Serial.print(message[7+i], HEX);
-        Serial.print("->");
-        Serial.print(longitude.asFloat);
-        Serial.print(",lat=" );
-        for (int i=0;i<4;i++)Serial.print(message[11+i], HEX);
-        Serial.print("->");
-        Serial.print(latitude.asFloat);
-        Serial.println("");
-    */
-
-    // Check connected AP data
-    /*
-    for (u = 0; u < aps_known_count; u++)
-    {
-      if (! memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN)) {
-        Serial.printf("[%32s]", aps_known[u].ssid);
-        known = 1;     // AP known => Set known flag
-        break;
-      }
-    }
-
-    if (! known)  {
-      Serial.printf("   Unknown/Malformed packet \r\n");
-      //  for (int i = 0; i < 6; i++) Serial.printf("%02x", ci.bssid[i]);
-    } else {
-      Serial.printf("%2s", " ");
-      for (int i = 0; i < 6; i++) Serial.printf("%02x", ci.ap[i]);
-      Serial.printf("  %3d", aps_known[u].channel);
-      Serial.printf("   %4d\r\n", ci.rssi);
-    }
-    */
   }
 }
 
-// CALLBACK
+// WiFi Callback
 void promisc_cb(uint8_t *buf, uint16_t len)
 {
   int i = 0;
@@ -224,15 +179,7 @@ void promisc_cb(uint8_t *buf, uint16_t len)
   if (len == 12) {
     struct RxControl *sniffer = (struct RxControl*) buf;
   } else if (len == 128) {
-    /*
     //Serial.printf("Becon received \n");
-    struct sniffer_buf2 *sniffer = (struct sniffer_buf2*) buf;
-    struct beaconinfo beacon = parse_beacon(sniffer->buf, 112, sniffer->rx_ctrl.rssi);
-    if (register_beacon(beacon) == 0) {
-      print_beacon(beacon);
-      nothing_new = 0;
-    }
-    */
   } else {
     struct sniffer_buf *sniffer = (struct sniffer_buf*) buf;
     //Is data or QOS?
