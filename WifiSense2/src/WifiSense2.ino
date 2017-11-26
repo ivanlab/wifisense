@@ -5,31 +5,31 @@
 
 #include <SPI.h>
 #include <WiFi.h>
-#include <TinyGPS++.h>                                  // Tiny GPS Plus Library
+#include <TinyGPS++.h>                     // Tiny GPS Plus Library
 #include <SoftwareSerial.h>
 #include "./functions2.h"
 #define disable 0
 #define enable  1
 
 unsigned int channel = 1;
-static const uint32_t GPSBaud = 9600;                   // Ublox GPS default Baud Rate is 9600
+static const uint32_t GPSBaud = 9600;     // Ublox GPS default Baud Rate is 9600
 unsigned long gpsTimer = millis();
 int positioned = 0;
 
 
 void setup() {
 
-  Serial.begin(115200);    // Console debug
-  Serial1.begin(9600);    // Link to Particle LTE
-  ss.begin(GPSBaud);      // Link to GPS
+  Serial.begin(115200);                  // Console debug
+  Serial1.begin(9600);                   // Link to Particle LTE
+  ss.begin(GPSBaud);                     // Link to GPS
   Serial.printf("\n\nSDK version:%s\n\r", system_get_sdk_version());
   Serial.println(F("ESP8266 mini-sniff - MQTT version"));
   Serial.println(TinyGPSPlus::libraryVersion());
 
-  pinMode(14, OUTPUT);    // GPS chip enable pin
-  digitalWrite(14, LOW);  // Shut down GPS for now...
-  delay (3000);           // Estabilize GPS - 3 seconds OFF
-  digitalWrite(14, HIGH); // Turn ON GPS
+  pinMode(14, OUTPUT);                   // GPS chip enable pin
+  digitalWrite(14, LOW);                 // Shut down GPS for now...
+  delay (1000);                          // Estabilize GPS - 1 seconds OFF
+  digitalWrite(14, HIGH);                // Turn ON GPS
   byte message[15]="Searching GPS";
   sendMessage("C1", message);
 
@@ -54,7 +54,7 @@ void setup() {
       sendMessage("C1", message);
       Serial.print("Unable to get GPS fix - Available Sats: "+gps.satellites.value());
     }
-    digitalWrite(14, LOW);  // Turn OFF GPS
+    digitalWrite(14, LOW);                  // Turn OFF GPS
 
   // Define WiFi scanning parameters
   wifi_set_opmode(STATION_MODE);            // Promiscuous works only with station mode
