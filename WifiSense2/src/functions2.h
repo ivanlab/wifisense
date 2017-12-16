@@ -13,19 +13,17 @@ extern "C" {
   }
 
 #include <WiFi.h>
-#include <TinyGPS++.h>                                  // Tiny GPS Plus Library
 #include <SoftwareSerial.h>
 #include "./structures.h"
 
 //Wifi Initialization Parameters
 #define MAX_APS_TRACKED     100
-#define MAX_CLIENTS_TRACKED 200
+#define MAX_CLIENTS_TRACKED 500
 beaconinfo aps_known[MAX_APS_TRACKED];            // Array to save MACs of known APs
 int aps_known_count = 0;                          // Number of known APs
 int nothing_new = 0;
-clientinfo clients_known[MAX_CLIENTS_TRACKED];    // Array to save MACs of known CLIENTs
+clientinfo clients_known[MAX_CLIENTS_TRACKED];    // Array to save data of known CLIENTs
 int clients_known_count = 0;                      // Number of known CLIENTs
-unsigned long time = millis();                    // Counter to reset client count
 
 //MQTT-SN Initialization Parameters
 #define MQTT_SN_MAX_PACKET_LENGTH     (255)
@@ -34,27 +32,13 @@ unsigned long time = millis();                    // Counter to reset client cou
 #define MQTT_SN_FLAG_RETAIN           (0x1 << 4)
 #define MQTT_SN_TOPIC_TYPE_SHORT      (0x02)
 
-// GPS Initialization Parameters
-static float lon = 0.0;
-static float lat = 0.0;
-TinyGPSPlus gps;                            //Create a GPS object
-static const int RXPin = 12, TXPin = 13;    // Ublox  GPS module to pins 12 and 13
-SoftwareSerial ss(RXPin, TXPin);            // The serial connection to the GPS device
-
-// GPS Reading function
-static void readGps(unsigned long ms)       // Smart delay function ensures that the gps object is being "fed".
-{
-  unsigned long start = millis();
-    do {
-      while (ss.available())gps.encode(ss.read());
-    } while (millis() - start < ms);
-}
 
 // MQTT-SN Message encapsulation and sending
-void sendMessage(const char topic[2], byte message[15], bool retain=false)
+void sendMessage(const char topic[2], byte message[], int messageSize, bool retain=false)
 {
-  uint8_t payload[24];                // Total size of MQTT-SN packet to be sent
-  payload[0] = 24;                    // header +sizeof message
+  uint8_t payload[messageSize+8];                // Total size of MQTT-SN packet to be sent
+  // Load the payload with the header
+  payload[0] = messageSize+8;                    // header +sizeof message
   payload[1] = MQTT_SN_TYPE_PUBLISH;
   payload[2] = MQTT_SN_FLAG_QOS_N1 | MQTT_SN_TOPIC_TYPE_SHORT;
   if (retain) {
@@ -66,21 +50,40 @@ void sendMessage(const char topic[2], byte message[15], bool retain=false)
   payload[6] = 0x00;                  // message ID Low
   payload[7] = 0x07;                  // size of header
 
-  Serial.print("Topic= "); Serial.print(topic[0]); Serial.print("-");
+  Serial.print("Type="); Serial.print(topic[0]); Serial.print(" / Payload>");
   // Load the message in the MQTT-SN payload
-    for (int i=8;i<24;i++){
-      payload[i] = message[i-8];
-    }
-
-  // Serialize the MQTT-SN packet
-    Serial1.write(254);               // startByte
-    for (int i=0;i<24;i++){
-      Serial.print(payload[i], HEX);  // Log HEX payload to console (debugging)
-      Serial1.write(payload[i]);      //transmit to Particle via serial1
-    }
-    Serial1.write(255);               // stopByte
-    Serial.println();
+  for (int i=8;i<messageSize+8;i++){
+    payload[i] = message[i-8];
   }
+
+// Serialize the MQTT-SN packet
+  String stringOne = "";
+  Serial1.write('<');               // startByte
+  for (int i=0;i<messageSize+8;i++){
+    if (payload[i] < 0x10) {
+      stringOne = "0";
+      stringOne+= String(payload[i], HEX);
+    }else{
+      stringOne = String(payload[i], HEX);
+    }
+    Serial1.print(stringOne);      //transmit to Particle via serial1
+    Serial.print(stringOne);Serial.print("|");
+  }
+  Serial1.write('>');               // stopByte
+  Serial.println();
+}
+
+// Send array of clientinfo stored to MQTT evey n seconds
+void sendArrayOfClients (){
+  int length=clients_known_count*(ETH_MAC_LEN+1);   //+1 for the rssi
+  byte message[length];
+  for (int i=0; i<clients_known_count; i++){
+    memcpy(&message[i*(ETH_MAC_LEN+1)],&clients_known[i].station,ETH_MAC_LEN);
+  }
+  clients_known_count=0;
+  sendMessage("S1", message, length);
+
+}
 
 // STORE Known APs
 int register_beacon(beaconinfo beacon)
@@ -109,12 +112,6 @@ int register_beacon(beaconinfo beacon)
 //Store known clients
 int register_client(clientinfo ci){
   int known = 0;   // Clear known flag
-
-  // Clear known clients every minute
-  if (millis()-time > 60000) {
-    clients_known_count = 0;
-    time = millis();
-  }
 
   for (int u = 0; u < clients_known_count; u++){
     if (! memcmp(clients_known[u].station, ci.station, ETH_MAC_LEN)) {
@@ -152,22 +149,23 @@ void print_beacon(beaconinfo beacon)
 void print_client(clientinfo ci)
 {
   int u = 0;
-  byte message [7+8];                   // MAC + RSSI + Lat/Lon
+  int messageSize = 15;
+  byte message [messageSize];                   // MAC + RSSI + Lat/Lon
   int known = 0;                        // Clear known flag
   if (ci.err != 0) {
-    // nothing
+    Serial.println("Error de ci.err");
   } else {
+    /*
     for (int i = 0; i < 6; i++) {
           message[i] = ci.station[i];   // Load MAC address into Message
     }
      message[6] = ci.rssi;              // Load RSSI into Message
-
-    //add GPS position to Message - Serialize float
-    for (int i=0;i<4;i++) message[7+i] = (*((int*)&lon) >> 8 * i) & 0xFF;
-    for (int i=0;i<4;i++) message[11+i]= (*((int*)&lat) >> 8 * i) & 0xFF;
-
-    sendMessage("S1",message);
-
+    sendMessage("S1",message,messageSize);
+    */
+    Serial.print(clients_known_count);
+    Serial.print(" clients added to array: Mac=");
+    for (int i=0; i<6; i++) Serial.print(ci.station[i], HEX);
+    Serial.println();
   }
 }
 
