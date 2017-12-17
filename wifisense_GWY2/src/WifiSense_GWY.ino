@@ -23,17 +23,18 @@
 // Google Maps integration with Particle Cloud
 // GoogleMapsDeviceLocator locator;
 
-//SerialLogHandler logHandler;                  // log debug messages to console (Serial)
+SerialLogHandler logHandler;                  // log debug messages to console (Serial)
 
 // Battery initialization
 double batteryLife = 0;                       // battery related
 FuelGauge fuel;
 
 // Serial link to NodeMCU initial parameters
-const char numChars = 300;                  // Size of message from NodeMCU
-char receivedChars[numChars];                 // Array holding message coming from NodeMCU
+const int numChars = 500;                  // Size of message from NodeMCU
+char receivedChars[500];                 // Array holding message coming from NodeMCU
 int lastNdx;
 boolean newData = false;
+
 
 // MQTT Functions
 byte payload[24] ;
@@ -68,7 +69,7 @@ void setup() {
   digitalWrite(D5, LOW);
 
   Serial.begin(9600);                                // debug USB port
-  Serial1.begin(115200);                             // NodeMCU comms port
+  Serial1.begin(9600);                             // NodeMCU comms port
   Serial4.begin(9600);                               // GPS Comms port
   Serial.println("Particle Up");
   Serial.println(TinyGPSPlus::libraryVersion());     // Print GPS lib version
@@ -98,7 +99,7 @@ void setup() {
 
  // Log battery status to Console, MQTT and Particle cloud
   Serial.print(battery);                             // Log battery level to Serial
-  Serial.print(batteryV);
+  Serial.println(batteryV);
   Particle.publish(battery);                         // Log battery to Particle cloud
   Particle.publish(batteryV);
   client.publish  ("ivanlab/particle_gwy",battery);  // Log battery to MQTT cloud
@@ -117,7 +118,7 @@ void loop() {
     Serial.print("...reconnecting MQTT");
     client.publish  ("ivanlab/particle_gwy","Particle1 reconnecting...");
   }
-
+/*
   if(digitalRead(D5)==HIGH) {                       // Read and publish GPS
       readGps(500);
     if ( (gps.location.lat()!=0 && gps.location.lng()!=0) || (millis() - gpsTimer > 300e3)){
@@ -129,7 +130,7 @@ void loop() {
       digitalWrite(D5, LOW);                         // Turn off  GPS
     }
   }
-
+*/
   recvWithStartEndMarkers();                        // Read Serial link from NodeMCU
   if (newData) publishNewData();                                 // Write to MQTT
   client.loop();                                    // Allow to check for MQTT callback
@@ -166,7 +167,7 @@ int getBatteryLife(String command) {
 // Serial communications with NodeMCU functions
 void recvWithStartEndMarkers() {
   static boolean recvInProgress = false;
-  static char ndx = 0;
+  static int ndx = 0;
   char startMarker = '<';
   char endMarker = '>';
   char rc;
@@ -176,9 +177,11 @@ void recvWithStartEndMarkers() {
       if (rc != endMarker) {
           receivedChars[ndx] = rc;
           ndx++;
+
           if (ndx >= numChars) {
               ndx = numChars - 1;
           }
+
       }
       else {
           receivedChars[ndx] = '\0'; // terminate the string
@@ -189,7 +192,7 @@ void recvWithStartEndMarkers() {
       }
     }
     else if (rc == startMarker) {
-        recvInProgress = true;
+      recvInProgress = true;
     }
   }
 }
@@ -227,7 +230,15 @@ void publishNewData(){
   Serial.print("payload size advertised="); Serial.println(payloadSize);
 
   // print received message to console
-  Serial.print("Received chars="); Serial.println(lastNdx);
+  Serial.print("Received chars="); Serial.println(lastNdx+2);
+
+  if (lastNdx<payloadSize*2){
+    Serial.println("Error de recepcion Serial");
+    newData = false;
+    lastNdx= 0;
+    return;
+  }
+
   for (int i=0; i < lastNdx; i=i+2) {
     Serial.print(receivedChars[i]);
     Serial.print(receivedChars[i+1]);
@@ -250,17 +261,18 @@ void publishNewData(){
      int receivedClients = (payloadSize-8)/7; Serial.print("# de rcv.macs: "); Serial.println(receivedClients);
 
      // 2 - Extract Mac address from SN
-     char mac[receivedClients][17];              //17 caracteres por cada Mac recibida
+     char mac[receivedClients][19];              //17 caracteres por cada Mac recibida
      for (int f=0;f<receivedClients;f++) {
+       Serial.print(f+1); Serial.print(" client -> ");
        for (int i=0;i<17;i=i+3) {
-         Serial.print("f=");Serial.print(f);Serial.print(" i=");Serial.print(i/3);
-         Serial.print(" Char=");
-         mac[f][i]=receivedChars[16+i/3+7*f];
-         Serial.print(receivedChars[16+i/3+7*f]);
-         mac[f][i+1]=receivedChars[16+i/3+7*f+1];
-         Serial.println(receivedChars[16+i/3+7*f+1]);
-         mac[f][i+2]=':';
+         mac[f][i]=receivedChars[16+(2*i/3)+(14*f)];
+         Serial.print(receivedChars[16+(2*i/3)+(14*f)]);
+         mac[f][i+1]=receivedChars[17+(2*i/3)+(14*f)];
+         Serial.print(receivedChars[17+(2*i/3)+(14*f)]);
+         mac[f][i+2]=':'; Serial.print(":");
         }
+        mac[f][18]='\0';
+        Serial.println();
       }
 
      // 3 - Extract RSSI
@@ -273,32 +285,35 @@ void publishNewData(){
        rssi = (~rssiValue+1);
        rssiString = String (-(rssi), DEC);
        Serial.print("rssi=");Serial.println(rssiString);
-       rssiString.toCharArray(rssiChar[f*7],4);
+       rssiString.toCharArray(rssiChar[f],4);
       }
 
    //Encapsulate in JSON
     {
-     StaticJsonBuffer<300> jsonBuffer;
+     DynamicJsonBuffer jsonBuffer(512);
      JsonObject& root = jsonBuffer.createObject();
      root["sensor"] = 1;
      root["timestamp"] = now_time;
-     /*
+/*
      for (int i=0; i<receivedClients;i++){
        macs="mac"+String(i);
        rssis="rssi"+String(i);
        root[macs] = mac[i][0];
        root[rssis] = rssiChar[i][0];
       }
-      */
+*/
 
      root.prettyPrintTo(Serial);
 
      //Publish the MQTT payload
-     char jsonChar[300];
+     char jsonChar[512];
      root.printTo(jsonChar);
      client.publish(topic,jsonChar);
-     Particle.publish("wifisense",jsonChar);
+     //Particle.publish("wifisense",jsonChar);
+     Serial.println("========================");
+
     }
+
   }else{                                // it is a control message?
     if(t1=='C'){
       char message[15];
@@ -306,22 +321,24 @@ void publishNewData(){
       message[23]='/n';
       Serial.print(message);          //Log Message to console
 
-      StaticJsonBuffer<200> jsonBuffer;
-      char jsonChar[200];
+      DynamicJsonBuffer jsonBuffer(512);
+      char jsonChar[512];
       JsonObject& root = jsonBuffer.createObject();
       root["sensor"] = 1;
       root["timestamp"] = now_time;
       root["Message"] = message;
       root.printTo(jsonChar);
       root.prettyPrintTo(Serial);     //Log JSON to console
-
+      Serial.println("========================");
       //Publish the MQTT payload
       client.publish(topic,jsonChar);
-      Particle.publish("wifisense",jsonChar);
+      //Particle.publish("wifisense",jsonChar);
     }
   }
  newData = false;
  lastNdx= 0;
+ Serial.println("end of published data");
+ return;
 }
 
 void sendPosition(float lat, float lon){
@@ -334,8 +351,8 @@ void sendPosition(float lat, float lon){
   longit.toCharArray(longitude,9);
   latit.toCharArray(latitude,9);
 
-  char jsonChar[200];
-  StaticJsonBuffer<200> jsonBuffer;
+  char jsonChar[512];
+  DynamicJsonBuffer jsonBuffer(512);
   JsonObject& root = jsonBuffer.createObject();
   root["sensor"] = 1;
   root["timestamp"] = now_time;
@@ -343,7 +360,7 @@ void sendPosition(float lat, float lon){
   root["lat"] = latitude;
   root.printTo(jsonChar);
   root.prettyPrintTo(Serial);
-
+  Serial.println("========================");
   client.publish("C1",jsonChar);
   Particle.publish("wifisense",jsonChar);
 }

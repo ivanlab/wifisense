@@ -50,7 +50,9 @@ void sendMessage(const char topic[2], byte message[], int messageSize, bool reta
   payload[6] = 0x00;                  // message ID Low
   payload[7] = 0x07;                  // size of header
 
-  Serial.print("Type="); Serial.print(topic[0]); Serial.print(" / Payload>");
+  Serial.print("Type="); Serial.println(topic[0]);
+  Serial.print("Payload size advertised="); Serial.println(payload[0], DEC);
+  Serial.print("Payload>");
   // Load the message in the MQTT-SN payload
   for (int i=8;i<messageSize+8;i++){
     payload[i] = message[i-8];
@@ -58,7 +60,8 @@ void sendMessage(const char topic[2], byte message[], int messageSize, bool reta
 
 // Serialize the MQTT-SN packet
   String stringOne = "";
-  Serial1.write('<');               // startByte
+  int ndx=0;
+  Serial1.write('<'); Serial.print("<");              // startByte
   for (int i=0;i<messageSize+8;i++){
     if (payload[i] < 0x10) {
       stringOne = "0";
@@ -68,8 +71,10 @@ void sendMessage(const char topic[2], byte message[], int messageSize, bool reta
     }
     Serial1.print(stringOne);      //transmit to Particle via serial1
     Serial.print(stringOne);Serial.print("|");
+    ndx=ndx+2;
   }
-  Serial1.write('>');               // stopByte
+  Serial1.write('>'); Serial.println(">");                // stopByte
+  Serial.print("Caracteres enviados:"); Serial.println(ndx+2);
   Serial.println();
 }
 
@@ -79,7 +84,13 @@ void sendArrayOfClients (){
   byte message[length];
   for (int i=0; i<clients_known_count; i++){
     memcpy(&message[i*(ETH_MAC_LEN+1)],&clients_known[i].station,ETH_MAC_LEN);
+    memcpy(&message[(i+1)*(ETH_MAC_LEN+1)],&clients_known[i].rssi,sizeof(char));
+    char rssi = (~message[(i+1)*(ETH_MAC_LEN+1)]+1);
+    Serial.print(message[(i+1)*(ETH_MAC_LEN+1)], HEX); Serial.print("->RSSI="); Serial.println(String (-(rssi), DEC));
   }
+  Serial.println();
+  for (int i=0; i<length; i++) {Serial.print(message[i],HEX);Serial.print("|");}
+  Serial.println();
   clients_known_count=0;
   sendMessage("S1", message, length);
 
