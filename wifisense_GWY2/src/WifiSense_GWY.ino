@@ -24,12 +24,13 @@
 
 SerialLogHandler logHandler;                  // log debug messages to console (Serial)
 
-#define window        300                        // Secs between transmissions from NodeMCU
-#define sensorID      2
-#define controlTopic  "C2"
-#define topicName     "ivanlab"
-#define sensorName    "Nelium-Particle-2"
-String controlID = String (topicName) + String ('/C') + String(sensorID);
+#define window              300                        // Secs between transmissions from NodeMCU
+#define sensorID            2
+#define controlTopic        "ivanlab/C2"
+#define TOPIC_NAME           "ivanlab/"
+#define sensorName          "Nelium-Particle-2"
+#define CONTROL_ITERACTIONS 1
+String controlID = String (TOPIC_NAME) + String ('C') + String(sensorID);
 
 // Battery initialization
 double batteryLife = 0;                       // battery related
@@ -62,6 +63,8 @@ static float lat = 0.0;
 unsigned long gpsTimer = millis();
 TinyGPSPlus gps;
 
+int iteractions = 0;
+
 
 //                           ********* SETUP *********
 
@@ -85,13 +88,13 @@ void setup() {
   batteryLife = fuel.getSoC();
   Particle.variable("batteryLife", batteryLife);
   Particle.function("getSoC", getBatteryLife);
-  String battery="Battery level: "+String(getBatteryLife("get"))+"% ";
-  String batteryV="Battery Volt: "+String(fuel.getVCell()) + "V ";
+  String battery=String(getBatteryLife("get"))+"% ";
+  String batteryV=String(fuel.getVCell()) + "V ";
 
  // MQTT initialization
   client.connect(sensorName);
   if (client.isConnected()) {
-    client.publish  (controlID,"Particle Connected to MQTT");
+    client.publish  (controlID,sensorName);
     client.subscribe(controlID);
     Serial.println("MQTT Up");
     Particle.publish(String(sensorName) + " - MQTT UP");
@@ -107,8 +110,6 @@ void setup() {
   Serial.println(batteryV);
   Particle.publish(battery);                         // Log battery to Particle cloud
   Particle.publish(batteryV);
-  client.publish  (controlID,battery);  // Log battery to MQTT cloud
-  client.publish  (controlID,batteryV);
 
   digitalWrite(D6, HIGH);                            // Enable NodeMCU
   digitalWrite(D5, HIGH);                            // Enable GPS
@@ -217,7 +218,7 @@ void publishNewData() {
   // 1 - Extract Topic from SN message
   char t1 = (h2d(receivedChars[6]) << 4) | h2d(receivedChars[7]);
   char t2 = (h2d(receivedChars[8]) << 4) | h2d(receivedChars[9]);
-  String topic ="ivanlab/";
+  String topic =TOPIC_NAME;
   topic += t1;
   topic += t2;
   Serial.print("topic=");
@@ -290,10 +291,13 @@ void publishNewData() {
      client.publish(topic,jsonChar);
     }
 
-   String battery=String(getBatteryLife("get"))+"% ";
-   String batteryV=String(fuel.getVCell()) + "V ";
-   Particle.publish("Battery level" , battery);
-   Particle.publish("Battery volt" , batteryV);
+    // Control channel added data
+    iteractions++;
+    if(iteractions % CONTROL_ITERACTIONS == 0){
+      sendPosition(lat,lon);
+      iteractions=0;
+    }
+
 
    Serial.println("=====>> Going for a nap...");
    if (digitalRead(D5)==LOW) System.sleep(D1,RISING,window-45);
@@ -306,8 +310,8 @@ void publishNewData() {
       }
       message[(payloadSize-8+1)]='/n';
 
-      DynamicJsonBuffer jsonBuffer(512);
-      char jsonChar[512];
+      DynamicJsonBuffer jsonBuffer(200);
+      char jsonChar[200];
       JsonObject& root = jsonBuffer.createObject();
       root["sensor"] = sensorID;
       root["timestamp"] = now_time;
@@ -329,24 +333,35 @@ void sendPosition(float lat, float lon){
   uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
   char longitude[9];
   char latitude[9];
+  char batteryChar[4];
+  char batteryVChar[5];
+
 
   String longit = String(lon,4);
   String latit = String(lat,4);
   longit.toCharArray(longitude,9);
   latit.toCharArray(latitude,9);
+  String battery=String(getBatteryLife("get"))+"% ";
+  String batteryV=String(fuel.getVCell()) + "V ";
+  battery.toCharArray(batteryChar,3);
+  batteryV.toCharArray(batteryVChar,4);
 
-  char jsonChar[512];
-  DynamicJsonBuffer jsonBuffer(512);
+  char jsonChar[200];
+  DynamicJsonBuffer jsonBuffer(200);
   JsonObject& root = jsonBuffer.createObject();
   root["sensor"] = sensorID;
   root["timestamp"] = now_time;
   root["lon"] = longitude;
   root["lat"] = latitude;
+  root["Battery"] = batteryChar;
+  root["Voltage"] = batteryVChar;
   root.printTo(jsonChar);
   root.prettyPrintTo(Serial);
-  Serial.println("========================");
+  Serial.println();
   client.publish(controlTopic,jsonChar);
   Particle.publish(sensorName,jsonChar);
+  Particle.publish("Battery level" , battery);
+  Particle.publish("Battery volt" , batteryV);
 }
 
 unsigned char h2d(unsigned char hex) {
