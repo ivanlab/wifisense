@@ -5,7 +5,6 @@
  * Date:2017.10
  */
 
-
  #include <MQTT.h>
  #include <ArduinoJson.h>
  #include <SparkTime.h>
@@ -24,6 +23,12 @@
 // GoogleMapsDeviceLocator locator;
 
 SerialLogHandler logHandler;                  // log debug messages to console (Serial)
+
+#define window      300                        // Secs between transmissions from NodeMCU
+#define sensorID    2
+#define topicName   "ivanlab"
+#define sensorName  "Nelium-Particle-2"
+String controlID = String (topicName) + String ('/C') + String(sensorID);
 
 // Battery initialization
 double batteryLife = 0;                       // battery related
@@ -48,8 +53,7 @@ SparkTime rtc;
 String timeStr;
 unsigned long currentTime;
 
-//JSON Functions
-//StaticJsonBuffer<200> jsonBuffer;
+unsigned long receiving;
 
 // GPS parameters
 static float lon = 0.0;
@@ -84,15 +88,15 @@ void setup() {
   String batteryV="Battery Volt: "+String(fuel.getVCell()) + "V ";
 
  // MQTT initialization
-  client.connect("ivanlab_particle_1");
+  client.connect(sensorName);
   if (client.isConnected()) {
-    client.publish  ("ivanlab/particle_gwy","Particle-1 Connected to MQTT");
-    client.subscribe("ivanlab/particle_gwy");
+    client.publish  (controlID,"Particle Connected to MQTT");
+    client.subscribe(controlID);
     Serial.println("MQTT Up");
-    Particle.publish("MQTT Connection UP");
+    Particle.publish(String(sensorName) + "MQTT Connection UP");
   } else {
-    Serial.print ("MQTT connection error");
-    Particle.publish("MQTT Connection ERROR");
+    Serial.print (String(sensorName) +"MQTT connection error");
+    Particle.publish(String(sensorName) + "MQTT Connection ERROR");
   }
   Serial.print ("MQTT keepalive: ");
   Serial.println(keepalive);
@@ -102,8 +106,8 @@ void setup() {
   Serial.println(batteryV);
   Particle.publish(battery);                         // Log battery to Particle cloud
   Particle.publish(batteryV);
-  client.publish  ("ivanlab/particle_gwy",battery);  // Log battery to MQTT cloud
-  client.publish  ("ivanlab/particle_gwy",batteryV);
+  client.publish  (controlID,battery);  // Log battery to MQTT cloud
+  client.publish  (controlID,batteryV);
 
   digitalWrite(D6, HIGH);                            // Enable NodeMCU
   digitalWrite(D5, HIGH);                            // Enable GPS
@@ -113,14 +117,13 @@ void setup() {
 
 void loop() {
 
-  if (!client.isConnected()) {                      // Check if MQTT still up
-    client.connect("ivanlab_particle_1");
+  if (!client.isConnected()) {
+    client.connect(sensorName);
     Serial.print("...reconnecting MQTT");
-    client.publish  ("ivanlab/particle_gwy","Particle1 reconnecting...");
-  }
-/*
-  if(digitalRead(D5)==HIGH) {                       // Read and publish GPS
-      readGps(500);
+    client.publish  (controlID,"Particle reconnecting...");
+  }                     // Check if MQTT still up
+  if(digitalRead(D5)==HIGH) {
+    readGps(300);
     if ( (gps.location.lat()!=0 && gps.location.lng()!=0) || (millis() - gpsTimer > 300e3)){
       lat=gps.location.lat();
       lon=gps.location.lng();
@@ -129,42 +132,28 @@ void loop() {
       sendPosition(lat,lon);
       digitalWrite(D5, LOW);                         // Turn off  GPS
     }
-  }
-*/
+  }                                           // Read GPS
   recvWithStartEndMarkers();                        // Read Serial link from NodeMCU
-  if (newData) publishNewData();                                 // Write to MQTT
+  if (newData) publishNewData();                    // Process received data and Write to MQTT
   client.loop();                                    // Allow to check for MQTT callback
   delay(1);
-  //System.sleep(D1,RISING,300);
 }
 
 //                           ****** FUNCTIONS *********
 
 
-static void readGps(unsigned long ms)       // Smart delay - gps object is being "fed".
-{
-  unsigned long start = millis();
-    do {
-      while (Serial4.available())gps.encode(Serial4.read());
-    } while (millis() - start < ms);
-}
-
-// MQTT Callback for subscription received messages
 void callback(char* topic, byte* payload, unsigned int length) {
-    char p[length + 1];
-    memcpy(p, payload, length);
-    p[length] = NULL;
+  char p[length + 1];
+  memcpy(p, payload, length);
+  p[length] = NULL;
 
 }
 
-// Function get battery life upon request
 int getBatteryLife(String command) {
-//Set Battery Life Variable with current battery life value
   batteryLife = fuel.getSoC();
   return (int)batteryLife;
 }
 
-// Serial communications with NodeMCU functions
 void recvWithStartEndMarkers() {
   static boolean recvInProgress = false;
   static int ndx = 0;
@@ -174,8 +163,10 @@ void recvWithStartEndMarkers() {
   while (Serial1.available() > 0 && newData == false) {
     rc = Serial1.read();
     if (recvInProgress == true) {
+      if ((millis()-receiving)> 10e3) ndx = 0;     // trash data in buffer if it's too old
       if (rc != endMarker) {
           receivedChars[ndx] = rc;
+          Serial.print(rc);
           ndx++;
 
           if (ndx >= numChars) {
@@ -185,6 +176,7 @@ void recvWithStartEndMarkers() {
       }
       else {
           receivedChars[ndx] = '\0'; // terminate the string
+          Serial.println();
           recvInProgress = false;
           lastNdx = ndx;
           ndx = 0;
@@ -193,46 +185,21 @@ void recvWithStartEndMarkers() {
     }
     else if (rc == startMarker) {
       recvInProgress = true;
+      receiving = millis();
     }
   }
 }
 
-// Time conversion functions
-
-time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss)
-{
-  struct tm t;
-  t.tm_year = YYYY-1900;
-  t.tm_mon = MM - 1;
-  t.tm_mday = DD;
-  t.tm_hour = hh;
-  t.tm_min = mm;
-  t.tm_sec = ss;
-  t.tm_isdst = 0;
-  time_t t_of_day = mktime(&t);
-  return t_of_day;
-}
-
-// Ascii to HEX helper
-unsigned char h2d(unsigned char hex)
-{
-  if(hex > 0x39) hex -= 7; // adjust for hex letters upper or lower case
-  return(hex & 0xf);
-}
-
-// Parse Serial line and publish new data
-void publishNewData(){
+void publishNewData() {
 
   uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
 
-  //Extract Payload size from first octect
   int payloadSize = (h2d(receivedChars[0]) << 4) | h2d(receivedChars[1]);  // convert to decimal
   Serial.print("payload size advertised="); Serial.println(payloadSize);
 
-  // print received message to console
   Serial.print("Received chars="); Serial.println(lastNdx+2);
 
-  if (lastNdx<payloadSize*2){
+  if (lastNdx<payloadSize*2) {
     Serial.println("Error de recepcion Serial");
     newData = false;
     lastNdx= 0;
@@ -246,85 +213,104 @@ void publishNewData(){
   }
   Serial.println();
 
-   // 1 - Extract Topic from SN message
-   char t1 = (h2d(receivedChars[6]) << 4) | h2d(receivedChars[7]);
-   char t2 = (h2d(receivedChars[8]) << 4) | h2d(receivedChars[9]);
-   String topic ="ivanlab/";
-   topic += t1;
-   topic += t2;
+  // 1 - Extract Topic from SN message
+  char t1 = (h2d(receivedChars[6]) << 4) | h2d(receivedChars[7]);
+  char t2 = (h2d(receivedChars[8]) << 4) | h2d(receivedChars[9]);
+  String topic ="ivanlab/";
+  topic += t1;
+  topic += t2;
+  Serial.print("topic=");
+  Serial.println(topic);
 
-   Serial.print("topic=");
-   Serial.println(topic);
+  if(t1=='S'){       //if Message is written to the DATA topic
 
-   if(t1=='S'){       //if Message is written to the DATA topic
+    int receivedClients = (payloadSize-8)/11; Serial.print("# de rcv.macs: "); Serial.println(receivedClients);
 
-     int receivedClients = (payloadSize-8)/7; Serial.print("# de rcv.macs: "); Serial.println(receivedClients);
-
-     // 2 - Extract Mac address from SN
-     char mac[receivedClients][19];              //17 caracteres por cada Mac recibida
-     for (int f=0;f<receivedClients;f++) {
-       Serial.print(f+1); Serial.print(" client -> ");
-       for (int i=0;i<17;i=i+3) {
-         mac[f][i]=receivedChars[16+(2*i/3)+(14*f)];
-         Serial.print(receivedChars[16+(2*i/3)+(14*f)]);
-         mac[f][i+1]=receivedChars[17+(2*i/3)+(14*f)];
-         Serial.print(receivedChars[17+(2*i/3)+(14*f)]);
-         mac[f][i+2]=':'; Serial.print(":");
-        }
-        mac[f][18]='\0';
-        Serial.println();
+    // 2 - Extract Mac address from SN
+    char mac[receivedClients][19];              //17 caracteres por cada Mac recibida
+    for (int f=0;f<receivedClients;f++) {
+      Serial.print(f+1); Serial.print(" client -> ");
+      for (int i=0;i<17;i=i+3) {
+       mac[f][i]=receivedChars[16+(2*i/3)+(22*f)];
+       Serial.print(receivedChars[16+(2*i/3)+(22*f)]);
+       mac[f][i+1]=receivedChars[17+(2*i/3)+(22*f)];
+       Serial.print(receivedChars[17+(2*i/3)+(22*f)]);
+       mac[f][i+2]=':'; Serial.print(":");
       }
+      mac[f][18]='\0';
+      Serial.println();
+    }
 
-     // 3 - Extract RSSI
-     char rssiChar[receivedClients][4];
-     char rssi;
-     char rssiValue;
-     String rssiString;
-     for (int f=0; f<receivedClients;f++){
-       rssiValue = (h2d(receivedChars[28+f*7]) << 4) | h2d(receivedChars[29+f*7]);
-       rssi = (~rssiValue+1);
-       rssiString = String (-(rssi), DEC);
-       Serial.print("rssi=");Serial.println(rssiString);
-       rssiString.toCharArray(rssiChar[f],4);
+    // 3 - Extract RSSI
+    char rssiChar[receivedClients][4];
+    char rssi;
+    char rssiValue;
+    String rssiString;
+    for (int f=0; f<receivedClients;f++){
+      rssiValue = (h2d(receivedChars[28+f*22]) << 4) | h2d(receivedChars[29+f*22]);
+      rssi = (~rssiValue+1);
+      rssiString = String (-(rssi), DEC);
+      Serial.print("rssi=");Serial.println(rssiString);
+      rssiString.toCharArray(rssiChar[f],4);
+    }
+
+    // 4 - Extract timestamp
+
+    unsigned long times[receivedClients];
+    for (int f=0; f<receivedClients;f++){
+      union {
+        char myByte[4];
+        unsigned long myLong;
+      } myUnion;
+
+      for (int i=0; i<4;i++){
+        char byteHexTime = (h2d(receivedChars[30+i*2+f*22]) << 4) | h2d(receivedChars[31+i*2+f*22]);
+        myUnion.myByte[i] = byteHexTime;
       }
+      times[f]=myUnion.myLong;
+      Serial.print("millis="); Serial.println(myUnion.myLong);
+    }
+
 
    //Encapsulate in JSON
-    {
-     DynamicJsonBuffer jsonBuffer(512);
+    DynamicJsonBuffer jsonBuffer(200);
+    for (int i=0; i<receivedClients;i++){
      JsonObject& root = jsonBuffer.createObject();
-     root["sensor"] = 1;
-     root["timestamp"] = now_time;
-/*
-     for (int i=0; i<receivedClients;i++){
-       macs="mac"+String(i);
-       rssis="rssi"+String(i);
-       root[macs] = mac[i][0];
-       root[rssis] = rssiChar[i][0];
-      }
-*/
-
+     root["sensor"] = sensorID;
+     root["timestamp"] = now_time - window + times[i]/1000;
+     root["mac"] = mac[i];
+     root["rssi"]= rssiChar[i];
      root.prettyPrintTo(Serial);
+     Serial.println();
 
      //Publish the MQTT payload
-     char jsonChar[512];
+     char jsonChar[200];
      root.printTo(jsonChar);
      client.publish(topic,jsonChar);
-     //Particle.publish("wifisense",jsonChar);
-     Serial.println("========================");
+
+     String battery=String(getBatteryLife("get"))+"% ";
+     String batteryV=String(fuel.getVCell()) + "V ";
+     Particle.publish("Battery level" , battery);                         // Log battery to Particle cloud
+     Particle.publish("Battery volt" , batteryV);
 
     }
 
+   Serial.println("========================>> Going for a nap...");
+   if (digitalRead(D5)==LOW) System.sleep(D1,RISING,window-45);
+
+
   }else{                                // it is a control message?
     if(t1=='C'){
-      char message[15];
-      for (int i=8; i<23;i++) message[i-8]=receivedChars[i];
-      message[23]='/n';
-      Serial.print(message);          //Log Message to console
+      char message[(payloadSize-8+1)];
+      for (int i=8; i<payloadSize;i++) {
+        message[i-8]= (h2d(receivedChars[i*2]) << 4) | h2d(receivedChars[i*2+1]);
+      }
+      message[(payloadSize-8+1)]='/n';
 
       DynamicJsonBuffer jsonBuffer(512);
       char jsonChar[512];
       JsonObject& root = jsonBuffer.createObject();
-      root["sensor"] = 1;
+      root["sensor"] = sensorID;
       root["timestamp"] = now_time;
       root["Message"] = message;
       root.printTo(jsonChar);
@@ -354,7 +340,7 @@ void sendPosition(float lat, float lon){
   char jsonChar[512];
   DynamicJsonBuffer jsonBuffer(512);
   JsonObject& root = jsonBuffer.createObject();
-  root["sensor"] = 1;
+  root["sensor"] = sensorID;
   root["timestamp"] = now_time;
   root["lon"] = longitude;
   root["lat"] = latitude;
@@ -363,4 +349,29 @@ void sendPosition(float lat, float lon){
   Serial.println("========================");
   client.publish("C1",jsonChar);
   Particle.publish("wifisense",jsonChar);
+}
+
+unsigned char h2d(unsigned char hex) {
+  if(hex > 0x39) hex -= 7; // adjust for hex letters upper or lower case
+  return(hex & 0xf);
+}
+
+static void readGps(unsigned long ms) {
+  unsigned long start = millis();
+  do {
+    while (Serial4.available())gps.encode(Serial4.read());
+  } while (millis() - start < ms);
+}
+
+time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss) {
+  struct tm t;
+  t.tm_year = YYYY-1900;
+  t.tm_mon = MM - 1;
+  t.tm_mday = DD;
+  t.tm_hour = hh;
+  t.tm_min = mm;
+  t.tm_sec = ss;
+  t.tm_isdst = 0;
+  time_t t_of_day = mktime(&t);
+  return t_of_day;
 }

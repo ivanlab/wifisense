@@ -2,15 +2,19 @@
 // added XBEE transport by Ivan Padilla 20171001
 // added MQTT-SN encapsulation by Ivan Padilla 20171001
 
+#define window      300
+#define controlID   "C2"    // Change sensorID in functions module
+
+static unsigned long time = millis();                    // Counter to reset client count
 
 #include <SPI.h>
 #include <WiFi.h>
 #include "./functions2.h"
 #define disable 0
-#define enable  1
+#define enable 1
 
 unsigned int channel = 1;
-unsigned long time = millis();                    // Counter to reset client count
+
 
 
 void setup() {
@@ -21,7 +25,7 @@ void setup() {
   Serial.println(F("ESP8266 mini-sniff - MQTT version"));
 
   byte message[15]="NodeMCU up";
-  sendMessage("C1", message, 10);
+  sendMessage(controlID, message, 15);
 
   // Define WiFi scanning parameters
   wifi_set_opmode(STATION_MODE);            // Promiscuous works only with station mode
@@ -45,11 +49,10 @@ void loop() {
       wifi_set_channel(channel);
     }
     delay(1);                         // critical processing timeslice for NONOS SDK! No delay(0) yield()
-    if (millis()>time+30e3) {
+    if (millis()>time+(window*1000)) {
       Serial.println("Sending...");
       sendArrayOfClients();
       time = millis();
     }
   }
 }
-// test

@@ -5,25 +5,27 @@
 
 // Expose Espressif SDK functionality
 extern "C" {
-#include "user_interface.h"
+  #include "user_interface.h"
   typedef void (*freedom_outside_cb_t)(uint8 status);
   int  wifi_register_send_pkt_freedom_cb(freedom_outside_cb_t cb);
   void wifi_unregister_send_pkt_freedom_cb(void);
   int  wifi_send_pkt_freedom(uint8 *buf, int len, bool sys_seq);
-  }
+}
+
+#define sensorID    "S2"
 
 #include <WiFi.h>
-#include <SoftwareSerial.h>
 #include "./structures.h"
 
 //Wifi Initialization Parameters
-#define MAX_APS_TRACKED     100
+#define MAX_APS_TRACKED     1
 #define MAX_CLIENTS_TRACKED 500
 beaconinfo aps_known[MAX_APS_TRACKED];            // Array to save MACs of known APs
 int aps_known_count = 0;                          // Number of known APs
 int nothing_new = 0;
 clientinfo clients_known[MAX_CLIENTS_TRACKED];    // Array to save data of known CLIENTs
 int clients_known_count = 0;                      // Number of known CLIENTs
+unsigned long times[MAX_CLIENTS_TRACKED];
 
 //MQTT-SN Initialization Parameters
 #define MQTT_SN_MAX_PACKET_LENGTH     (255)
@@ -80,20 +82,20 @@ void sendMessage(const char topic[2], byte message[], int messageSize, bool reta
 
 // Send array of clientinfo stored to MQTT evey n seconds
 void sendArrayOfClients (){
-  int length=clients_known_count*(ETH_MAC_LEN+1);   //+1 for the rssi
+  int length=clients_known_count*(ETH_MAC_LEN+1+4);   //+1 for the rssi +4 time
   byte message[length];
   for (int i=0; i<clients_known_count; i++){
-    memcpy(&message[i*(ETH_MAC_LEN+1)],&clients_known[i].station,ETH_MAC_LEN);
-    memcpy(&message[(i+1)*(ETH_MAC_LEN+1)],&clients_known[i].rssi,sizeof(char));
-    char rssi = (~message[(i+1)*(ETH_MAC_LEN+1)]+1);
-    Serial.print(message[(i+1)*(ETH_MAC_LEN+1)], HEX); Serial.print("->RSSI="); Serial.println(String (-(rssi), DEC));
+    memcpy(&message[i*(ETH_MAC_LEN+1+4)],&clients_known[i].station,ETH_MAC_LEN);
+    memcpy(&message[i*(ETH_MAC_LEN+1+4)+6],&clients_known[i].rssi,sizeof(char));
+    memcpy(&message[i*(ETH_MAC_LEN+1+4)+7],&times[i],sizeof(unsigned long));
+    char rssi = (~message[i*(ETH_MAC_LEN+1+4)+6]+1);
+    Serial.print(message[i*(ETH_MAC_LEN+1+4)+6], HEX); Serial.print("->RSSI="); Serial.println(String (-(rssi), DEC));
   }
   Serial.println();
   for (int i=0; i<length; i++) {Serial.print(message[i],HEX);Serial.print("|");}
   Serial.println();
   clients_known_count=0;
-  sendMessage("S1", message, length);
-
+  sendMessage(sensorID, message, length);
 }
 
 // STORE Known APs
@@ -132,6 +134,7 @@ int register_client(clientinfo ci){
   }
   if (! known){
     memcpy(&clients_known[clients_known_count], &ci, sizeof(ci));
+    times[clients_known_count]=millis()-time;
     clients_known_count++;
 
     if ((unsigned int) clients_known_count >=

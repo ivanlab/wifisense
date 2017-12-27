@@ -1,6 +1,16 @@
 ArduinoJson: change log
 =======================
 
+HEAD
+----
+* Rewrote example `JsonHttpClient.ino` (issue #600)
+
+v5.11.2
+-------
+
+* Fixed `DynamicJsonBuffer::clear()` not resetting allocation size (issue #561)
+* Fixed incorrect rounding for float values (issue #588)
+
 v5.11.1
 -------
 
@@ -39,20 +49,20 @@ v5.10.0
 ### BREAKING CHANGES :warning:
 
 | Old syntax                      | New syntax          |
-|---------------------------------|---------------------|
+|:--------------------------------|:--------------------|
 | `double_with_n_digits(3.14, 2)` | `3.14`              |
 | `float_with_n_digits(3.14, 2)`  | `3.14f`             |
 | `obj.set("key", 3.14, 2)`       | `obj["key"] = 3.14` |
 | `arr.add(3.14, 2)`              | `arr.add(3.14)`     |
 
 | Input     | Old output | New output |
-|-----------|------------|------------|
+|:----------|:-----------|:-----------|
 | `3.14159` | `3.14`     | `3.14159`  |
 | `42.0`    | `42.00`    | `42`       |
 | `0.0`     | `0.00`     | `0`        |
 
 | Expression                     | Old result | New result |
-|--------------------------------|------------|------------|
+|:-------------------------------|:-----------|:-----------|
 | `JsonVariant(42).is<int>()`    | `true`     | `true`     |
 | `JsonVariant(42).is<float>()`  | `false`    | `true`     |
 | `JsonVariant(42).is<double>()` | `false`    | `true`     |

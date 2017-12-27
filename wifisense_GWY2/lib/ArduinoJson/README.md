@@ -1,7 +1,9 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/m7s53wav1l0abssg/branch/master?svg=true)](https://ci.appveyor.com/project/bblanchon/arduinojson/branch/master) [![Build Status](https://travis-ci.org/bblanchon/ArduinoJson.svg?branch=master)](https://travis-ci.org/bblanchon/ArduinoJson) [![Coverage Status](https://img.shields.io/coveralls/bblanchon/ArduinoJson.svg)](https://coveralls.io/r/bblanchon/ArduinoJson?branch=master) [![Star this project](http://githubbadges.com/star.svg?user=bblanchon&repo=ArduinoJson&style=flat&color=fff&background=007ec6)](https://github.com/bblanchon/ArduinoJson)
+
+![ArduinoJson's logo](banner.svg)
+
 ArduinoJson - C++ JSON library for IoT
 ====================
-
-[![Build status](https://ci.appveyor.com/api/projects/status/m7s53wav1l0abssg/branch/master?svg=true)](https://ci.appveyor.com/project/bblanchon/arduinojson/branch/master) [![Build Status](https://travis-ci.org/bblanchon/ArduinoJson.svg?branch=master)](https://travis-ci.org/bblanchon/ArduinoJson) [![Coverage Status](https://img.shields.io/coveralls/bblanchon/ArduinoJson.svg)](https://coveralls.io/r/bblanchon/ArduinoJson?branch=master) [![Star this project](http://githubbadges.com/star.svg?user=bblanchon&repo=ArduinoJson&style=flat&color=fff&background=007ec6)](https://github.com/bblanchon/ArduinoJson)
 
 *An elegant and efficient JSON library for embedded systems.*
 
@@ -23,6 +25,7 @@ Features
 * Small footprint
 * Header-only library
 * MIT License
+* [Comprehensive documentation](http://arduinojson.org)
 
 Works on
 --------
@@ -56,9 +59,9 @@ double latitude    = root["data"][0];
 double longitude   = root["data"][1];
 ```
 
-[See JsonParserExample.ino](examples/JsonParserExample/JsonParserExample.ino)
+[See JsonParserExample.ino](http://arduinojson.org/example/parser/)
 
-Use [ArduinoJson Assistant](https://bblanchon.github.io/ArduinoJson/assistant/) to compute the buffer size.
+Use [ArduinoJson Assistant](http://arduinojson.org/assistant/) to compute the buffer size.
 
 #### Encoding / Generating
 
@@ -78,17 +81,17 @@ root.printTo(Serial);
 // {"sensor":"gps","time":1351824120,"data":[48.756080,2.302038]}
 ```
 
-[See JsonGeneratorExample.ino](examples/JsonGeneratorExample/JsonGeneratorExample.ino)
+[See JsonGeneratorExample.ino](http://arduinojson.org/example/generator/)
 
-Use [ArduinoJson Assistant](https://bblanchon.github.io/ArduinoJson/assistant/) to compute the buffer size.
+Use [ArduinoJson Assistant](http://arduinojson.org/assistant/) to compute the buffer size.
 
 
 Documentation
 -------------
 
-The documentation is available online in the [ArduinoJson Website](https://bblanchon.github.io/ArduinoJson/).
+The documentation is available online in the [ArduinoJson Website](http://arduinojson.org/).
 
-The [ArduinoJson Assistant](https://bblanchon.github.io/ArduinoJson/assistant/) helps you get started with the library.
+The [ArduinoJson Assistant](http://arduinojson.org/assistant/) helps you get started with the library.
 
 
 Donators
@@ -119,6 +122,9 @@ Special thanks to the following persons and companies who made generous donation
 * Google Inc. <img alt='USA' src='https://cdnjs.cloudflare.com/ajax/libs/emojione/2.1.4/assets/svg/1f1fa-1f1f8.svg' width='18' height='18'>
 * Charles Haynes <img alt='Australia' src='https://d1j8pt39hxlh3d.cloudfront.net/development/emojione/2.2/989/2546.svg' width='18' height='18'>
 * Charles Walker <img alt='USA' src='https://cdnjs.cloudflare.com/ajax/libs/emojione/2.1.4/assets/svg/1f1fa-1f1f8.svg' width='18' height='18'>
+* Günther Jehle <img alt='Liechtenstein' src='https://cdnjs.cloudflare.com/ajax/libs/emojione/2.1.4/assets/svg/1f1f1-1f1ee.svg' width='18' height='18'>
+* Patrick Elliott
+* Alexander Wilms <img alt='Germany' src='https://cdnjs.cloudflare.com/ajax/libs/emojione/2.1.4/assets/svg/1f1e9-1f1ea.svg' width='18' height='18'>
 
 
 ---

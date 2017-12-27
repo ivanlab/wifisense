@@ -1,9 +1,6 @@
+// ArduinoJson - arduinojson.org
 // Copyright Benoit Blanchon 2014-2017
 // MIT License
-//
-// Arduino JSON library
-// https://bblanchon.github.io/ArduinoJson/
-// If you like this project, please add a star!
 
 #pragma once
 
@@ -106,15 +103,16 @@ inline const JsonArraySubscript JsonArray::operator[](size_t index) const {
   return JsonArraySubscript(*const_cast<JsonArray*>(this), index);
 }
 
-template <typename TImplem>
-inline JsonArraySubscript JsonVariantBase<TImplem>::operator[](size_t index) {
-  return as<JsonArray>()[index];
+template <typename TImpl>
+inline JsonArraySubscript JsonVariantSubscripts<TImpl>::operator[](
+    size_t index) {
+  return impl()->template as<JsonArray>()[index];
 }
 
-template <typename TImplem>
-inline const JsonArraySubscript JsonVariantBase<TImplem>::operator[](
+template <typename TImpl>
+inline const JsonArraySubscript JsonVariantSubscripts<TImpl>::operator[](
     size_t index) const {
-  return as<JsonArray>()[index];
+  return impl()->template as<JsonArray>()[index];
 }
 
 }  // namespace ArduinoJson
