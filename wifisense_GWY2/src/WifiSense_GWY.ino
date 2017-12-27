@@ -24,10 +24,11 @@
 
 SerialLogHandler logHandler;                  // log debug messages to console (Serial)
 
-#define window      300                        // Secs between transmissions from NodeMCU
-#define sensorID    2
-#define topicName   "ivanlab"
-#define sensorName  "Nelium-Particle-2"
+#define window        300                        // Secs between transmissions from NodeMCU
+#define sensorID      2
+#define controlTopic  "C2"
+#define topicName     "ivanlab"
+#define sensorName    "Nelium-Particle-2"
 String controlID = String (topicName) + String ('/C') + String(sensorID);
 
 // Battery initialization
@@ -93,7 +94,7 @@ void setup() {
     client.publish  (controlID,"Particle Connected to MQTT");
     client.subscribe(controlID);
     Serial.println("MQTT Up");
-    Particle.publish(String(sensorName) + "MQTT Connection UP");
+    Particle.publish(String(sensorName) + " - MQTT UP");
   } else {
     Serial.print (String(sensorName) +"MQTT connection error");
     Particle.publish(String(sensorName) + "MQTT Connection ERROR");
@@ -287,17 +288,15 @@ void publishNewData() {
      char jsonChar[200];
      root.printTo(jsonChar);
      client.publish(topic,jsonChar);
-
-     String battery=String(getBatteryLife("get"))+"% ";
-     String batteryV=String(fuel.getVCell()) + "V ";
-     Particle.publish("Battery level" , battery);                         // Log battery to Particle cloud
-     Particle.publish("Battery volt" , batteryV);
-
     }
 
-   Serial.println("========================>> Going for a nap...");
-   if (digitalRead(D5)==LOW) System.sleep(D1,RISING,window-45);
+   String battery=String(getBatteryLife("get"))+"% ";
+   String batteryV=String(fuel.getVCell()) + "V ";
+   Particle.publish("Battery level" , battery);
+   Particle.publish("Battery volt" , batteryV);
 
+   Serial.println("=====>> Going for a nap...");
+   if (digitalRead(D5)==LOW) System.sleep(D1,RISING,window-45);
 
   }else{                                // it is a control message?
     if(t1=='C'){
@@ -318,7 +317,6 @@ void publishNewData() {
       Serial.println("========================");
       //Publish the MQTT payload
       client.publish(topic,jsonChar);
-      //Particle.publish("wifisense",jsonChar);
     }
   }
  newData = false;
@@ -347,8 +345,8 @@ void sendPosition(float lat, float lon){
   root.printTo(jsonChar);
   root.prettyPrintTo(Serial);
   Serial.println("========================");
-  client.publish("C1",jsonChar);
-  Particle.publish("wifisense",jsonChar);
+  client.publish(controlTopic,jsonChar);
+  Particle.publish(sensorName,jsonChar);
 }
 
 unsigned char h2d(unsigned char hex) {
