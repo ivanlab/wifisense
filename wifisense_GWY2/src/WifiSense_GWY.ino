@@ -14,22 +14,25 @@
  #include <TinyGPS++.h>
  #include <Serial4/Serial4.h>
 
+ #define WINDOW              300                        // Secs between transmissions from NodeMCU
+ #define sensorID            1
+ #define CONTROL_TOPIC        "ivanlab/C1"
+ #define TOPIC_NAME           "ivanlab/"
+ #define SENSOR_NAME          "Nelium-Particle-1"
+ #define CONTROL_ITERACTIONS 1
+ #define APN                 "internetmas"
+ #define VERSION             "v1.0.2"
+
  // Set your 3rd-party SIM APN here
  // https://docs.particle.io/reference/firmware/electron/#setcredentials-
  //STARTUP(cellular_credentials_set("isp.mymeteor.ie", "my", "isp", NULL));
- STARTUP(cellular_credentials_set("internet", "", "", NULL));
+ STARTUP(cellular_credentials_set(APN, "", "", NULL));
 
 // Google Maps integration with Particle Cloud
 // GoogleMapsDeviceLocator locator;
 
 SerialLogHandler logHandler;                  // log debug messages to console (Serial)
 
-#define window              300                        // Secs between transmissions from NodeMCU
-#define sensorID            2
-#define controlTopic        "ivanlab/C2"
-#define TOPIC_NAME           "ivanlab/"
-#define sensorName          "Nelium-Particle-2"
-#define CONTROL_ITERACTIONS 1
 String controlID = String (TOPIC_NAME) + String ('C') + String(sensorID);
 
 // Battery initialization
@@ -65,6 +68,10 @@ TinyGPSPlus gps;
 
 int iteractions = 0;
 
+int enableGPS(String command);
+int preSatDetected = 0;
+
+
 
 //                           ********* SETUP *********
 
@@ -77,39 +84,37 @@ void setup() {
   digitalWrite(D5, LOW);
 
   Serial.begin(9600);                                // debug USB port
-  Serial1.begin(9600);                             // NodeMCU comms port
+  Serial1.begin(9600);                               // NodeMCU comms port
   Serial4.begin(9600);                               // GPS Comms port
   Serial.println("Particle Up");
   Serial.println(TinyGPSPlus::libraryVersion());     // Print GPS lib version
 
  // locator.withLocatePeriodic(30);
+  Particle.function("EnableGPS", enableGPS);
 
  //get battery life on startup
   batteryLife = fuel.getSoC();
   Particle.variable("batteryLife", batteryLife);
   Particle.function("getSoC", getBatteryLife);
-  String battery=String(getBatteryLife("get"))+"% ";
-  String batteryV=String(fuel.getVCell()) + "V ";
+  //String battery=String(getBatteryLife("get"))+"% ";
+  //String batteryV=String(fuel.getVCell()) + "V ";
 
  // MQTT initialization
-  client.connect(sensorName);
+  client.connect(SENSOR_NAME);
   if (client.isConnected()) {
-    client.publish  (controlID,sensorName);
+    client.publish  (controlID,SENSOR_NAME);
     client.subscribe(controlID);
     Serial.println("MQTT Up");
-    Particle.publish(String(sensorName) + " - MQTT UP");
+    Particle.publish(String(SENSOR_NAME) + " - MQTT UP");
   } else {
-    Serial.print (String(sensorName) +"MQTT connection error");
-    Particle.publish(String(sensorName) + "MQTT Connection ERROR");
+    Serial.print (String(SENSOR_NAME) +"MQTT connection error");
+    Particle.publish(String(SENSOR_NAME) + "MQTT Connection ERROR");
   }
   Serial.print ("MQTT keepalive: ");
   Serial.println(keepalive);
 
  // Log battery status to Console, MQTT and Particle cloud
-  Serial.print(battery);                             // Log battery level to Serial
-  Serial.println(batteryV);
-  Particle.publish(battery);                         // Log battery to Particle cloud
-  Particle.publish(batteryV);
+  sendPosition(0,0);
 
   digitalWrite(D6, HIGH);                            // Enable NodeMCU
   digitalWrite(D5, HIGH);                            // Enable GPS
@@ -119,13 +124,8 @@ void setup() {
 
 void loop() {
 
-  if (!client.isConnected()) {
-    client.connect(sensorName);
-    Serial.print("...reconnecting MQTT");
-    client.publish  (controlID,"Particle reconnecting...");
-  }                     // Check if MQTT still up
   if(digitalRead(D5)==HIGH) {
-    readGps(300);
+    readGps(500);
     if ( (gps.location.lat()!=0 && gps.location.lng()!=0) || (millis() - gpsTimer > 300e3)){
       lat=gps.location.lat();
       lon=gps.location.lng();
@@ -133,8 +133,15 @@ void loop() {
       Serial.print("/"); Serial.println(lat);
       sendPosition(lat,lon);
       digitalWrite(D5, LOW);                         // Turn off  GPS
+    } else {
+      if(gps.satellites.value()!=preSatDetected ) {
+        preSatDetected = gps.satellites.value();
+        String satNumber = String (SENSOR_NAME) + " -> Sats detected: " + String (gps.satellites.value());
+        Serial.println(satNumber);
+        client.publish(CONTROL_TOPIC,satNumber);
+      }
     }
-  }                                           // Read GPS
+  }                                               // Read GPS
   recvWithStartEndMarkers();                        // Read Serial link from NodeMCU
   if (newData) publishNewData();                    // Process received data and Write to MQTT
   client.loop();                                    // Allow to check for MQTT callback
@@ -193,6 +200,13 @@ void recvWithStartEndMarkers() {
 }
 
 void publishNewData() {
+
+  if (!client.isConnected()) {
+    client.connect(SENSOR_NAME);
+    Serial.print("...reconnecting MQTT");
+    String reconnect = String(SENSOR_NAME) + "reconnecting MQTT";
+    client.publish  (controlID,reconnect);
+  }
 
   uint32_t now_time = tmConvert_t(Time.year(), Time.month(), Time.day(), Time.hour(), Time.minute(), Time.second());
 
@@ -279,7 +293,7 @@ void publishNewData() {
     for (int i=0; i<receivedClients;i++){
      JsonObject& root = jsonBuffer.createObject();
      root["sensor"] = sensorID;
-     root["timestamp"] = now_time - window + times[i]/1000;
+     root["timestamp"] = now_time - WINDOW + times[i]/1000;
      root["mac"] = mac[i];
      root["rssi"]= rssiChar[i];
      root.prettyPrintTo(Serial);
@@ -298,10 +312,14 @@ void publishNewData() {
       iteractions=0;
     }
 
-
-   Serial.println("=====>> Going for a nap...");
-   if (digitalRead(D5)==LOW) System.sleep(D1,RISING,window-45);
-
+   if (digitalRead(D5)==LOW) {
+     String nap = String (SENSOR_NAME)+ String (" going for a nap...");
+     client.publish(CONTROL_TOPIC,nap);
+     System.sleep(D1,RISING,WINDOW-45);
+     String wakeup = String (SENSOR_NAME)+ String (" waking up...");
+     client.connect(SENSOR_NAME);
+     client.publish(CONTROL_TOPIC,wakeup);
+    }
   }else{                                // it is a control message?
     if(t1=='C'){
       char message[(payloadSize-8+1)];
@@ -341,27 +359,29 @@ void sendPosition(float lat, float lon){
   String latit = String(lat,4);
   longit.toCharArray(longitude,9);
   latit.toCharArray(latitude,9);
-  String battery=String(getBatteryLife("get"))+"% ";
-  String batteryV=String(fuel.getVCell()) + "V ";
-  battery.toCharArray(batteryChar,3);
-  batteryV.toCharArray(batteryVChar,4);
+  String battery1=String(getBatteryLife("get"))+"% ";
+  String batteryV1=String(fuel.getVCell()) + "V ";
+  battery1.toCharArray(batteryChar,3);
+  batteryV1.toCharArray(batteryVChar,4);
 
-  char jsonChar[200];
-  DynamicJsonBuffer jsonBuffer(200);
+  char jsonChar[300];
+  DynamicJsonBuffer jsonBuffer(300);
   JsonObject& root = jsonBuffer.createObject();
   root["sensor"] = sensorID;
+  root["Name"] = SENSOR_NAME;
+  root["Version"] = VERSION;
   root["timestamp"] = now_time;
+  root["APN"] = APN;
   root["lon"] = longitude;
   root["lat"] = latitude;
   root["Battery"] = batteryChar;
   root["Voltage"] = batteryVChar;
+
   root.printTo(jsonChar);
   root.prettyPrintTo(Serial);
   Serial.println();
-  client.publish(controlTopic,jsonChar);
-  Particle.publish(sensorName,jsonChar);
-  Particle.publish("Battery level" , battery);
-  Particle.publish("Battery volt" , batteryV);
+  client.publish(CONTROL_TOPIC,jsonChar);
+  Particle.publish(SENSOR_NAME,jsonChar);
 }
 
 unsigned char h2d(unsigned char hex) {
@@ -387,4 +407,10 @@ time_t tmConvert_t(int YYYY, byte MM, byte DD, byte hh, byte mm, byte ss) {
   t.tm_isdst = 0;
   time_t t_of_day = mktime(&t);
   return t_of_day;
+}
+
+int enableGPS(String data){
+  digitalWrite(D5, HIGH);
+  gpsTimer = millis();
+  return (1);
 }
